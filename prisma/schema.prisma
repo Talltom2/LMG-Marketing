@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChannelType {
+  WOOCOMMERCE
+  WALMART
+  AMAZON_US
+  AMAZON_CA
+  PINTEREST
+  TIKTOK
+  META
+  BING
+  GOOGLE
+  EMAIL
+  DIRECT
+  ORGANIC
+  OTHER
+}
+
+enum RecommendationStatus {
+  PROPOSED
+  APPROVED
+  MODIFIED
+  DEFERRED
+  REJECTED
+  EXECUTED
+  MEASURED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PLANNED
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  category    String?
+  season      String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  commerceMetrics   CommerceMetric[]
+  funnelMetrics     FunnelMetric[]
+  campaignProducts  CampaignProduct[]
+  recommendations   Recommendation[]
+}
+
+model Channel {
+  id             String      @id @default(cuid())
+  type           ChannelType
+  name           String
+  externalSource String?
+  externalId     String?
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  commerceMetrics CommerceMetric[]
+  funnelMetrics   FunnelMetric[]
+  campaigns       Campaign[]
+
+  @@unique([type, name])
+  @@unique([externalSource, externalId])
+}
+
+model CommerceMetric {
+  id        String   @id @default(cuid())
+  date      DateTime
+  productId String
+  channelId String
+  units     Int      @default(0)
+  revenue   Decimal  @default(0) @db.Decimal(12, 2)
+  inventory Int?
+  source    String   @default("sellerchamp")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  @@unique([date, productId, channelId, source])
+  @@index([date])
+  @@index([productId, date])
+  @@index([channelId, date])
+}
+
+model FunnelMetric {
+  id             String   @id @default(cuid())
+  date           DateTime
+  productId      String?
+  channelId      String?
+  sessions       Int      @default(0)
+  productViews   Int      @default(0)
+  addToCarts     Int      @default(0)
+  checkoutStarts Int      @default(0)
+  purchases      Int      @default(0)
+  revenue        Decimal  @default(0) @db.Decimal(12, 2)
+  source         String   @default("lmg-analytics")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id])
+  channel Channel? @relation(fields: [channelId], references: [id])
+
+  @@index([date])
+  @@index([productId, date])
+  @@index([channelId, date])
+}
+
+model SyncRun {
+  id           String   @id @default(cuid())
+  source       String
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  status       String   @default("RUNNING")
+  recordsRead  Int      @default(0)
+  recordsSaved Int      @default(0)
+  errorMessage String?
+
+  @@index([source, startedAt])
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  theme       String?
+  objective   String?
+  startDate   DateTime
+  endDate     DateTime
+  status      CampaignStatus @default(DRAFT)
+  channelId   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  channel         Channel?          @relation(fields: [channelId], references: [id])
+  products        CampaignProduct[]
+  recommendations Recommendation[]
+}
+
+model CampaignProduct {
+  campaignId String
+  productId  String
+  role       String?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, productId])
+}
+
+model Recommendation {
+  id             String               @id @default(cuid())
+  title          String
+  observation    String
+  recommendation String
+  rationale      String?
+  expectedImpact String?
+  status         RecommendationStatus @default(PROPOSED)
+  priority       Int                  @default(3)
+  productId      String?
+  campaignId     String?
+  decidedAt      DateTime?
+  executedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  product  Product?  @relation(fields: [productId], references: [id])
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  actions  Action[]
+}
+
+model Action {
+  id               String   @id @default(cuid())
+  recommendationId String
+  actionType       String
+  description      String
+  executionTarget  String?
+  completed        Boolean  @default(false)
+  completedAt      DateTime?
+  resultSummary    String?
+  createdAt        DateTime @default(now())
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+}
