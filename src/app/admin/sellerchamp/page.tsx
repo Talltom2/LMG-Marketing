@@ -20,7 +20,7 @@ export default function SellerchampAdminPage() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-lmg-internal-secret": secret,
+          "x-lmg-sync-secret": secret,
         },
         body: JSON.stringify({ startDate: startDate.toISOString(), endDate: endDate.toISOString() }),
       });
