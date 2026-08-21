@@ -141,6 +141,8 @@ export async function syncSellerchamp(startDate: Date, endDate: Date) {
           if (!sku) continue;
           const quantity = itemQuantity(item);
           const revenue = itemRevenue(item, quantity);
+          if (quantity <= 0 && revenue <= 0) continue;
+
           const date = day(order.purchased_at ?? order.created_at);
           const key = `${date.toISOString()}|${sku}|${channelId}`;
           const existing = aggregates.get(key) ?? { date, sku, channelId, units: 0, revenue: 0 };
