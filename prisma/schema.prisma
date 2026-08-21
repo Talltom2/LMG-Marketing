@@ -51,24 +51,28 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  commerceMetrics CommerceMetric[]
-  funnelMetrics   FunnelMetric[]
-  campaignProducts CampaignProduct[]
-  recommendations Recommendation[]
+  commerceMetrics   CommerceMetric[]
+  funnelMetrics     FunnelMetric[]
+  campaignProducts  CampaignProduct[]
+  recommendations   Recommendation[]
 }
 
 model Channel {
-  id        String      @id @default(cuid())
-  type      ChannelType
-  name      String
-  active    Boolean     @default(true)
-  createdAt DateTime    @default(now())
+  id             String      @id @default(cuid())
+  type           ChannelType
+  name           String
+  externalSource String?
+  externalId     String?
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   commerceMetrics CommerceMetric[]
   funnelMetrics   FunnelMetric[]
   campaigns       Campaign[]
 
   @@unique([type, name])
+  @@unique([externalSource, externalId])
 }
 
 model CommerceMetric {
@@ -81,12 +85,15 @@ model CommerceMetric {
   inventory Int?
   source    String   @default("sellerchamp")
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id])
   channel Channel @relation(fields: [channelId], references: [id])
 
   @@unique([date, productId, channelId, source])
   @@index([date])
+  @@index([productId, date])
+  @@index([channelId, date])
 }
 
 model FunnelMetric {
@@ -102,12 +109,27 @@ model FunnelMetric {
   revenue        Decimal  @default(0) @db.Decimal(12, 2)
   source         String   @default("lmg-analytics")
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   product Product? @relation(fields: [productId], references: [id])
   channel Channel? @relation(fields: [channelId], references: [id])
 
   @@index([date])
   @@index([productId, date])
+  @@index([channelId, date])
+}
+
+model SyncRun {
+  id           String   @id @default(cuid())
+  source       String
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  status       String   @default("RUNNING")
+  recordsRead  Int      @default(0)
+  recordsSaved Int      @default(0)
+  errorMessage String?
+
+  @@index([source, startedAt])
 }
 
 model Campaign {
