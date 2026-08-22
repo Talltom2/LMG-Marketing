@@ -10,7 +10,7 @@ const num = (v: any): number | null => {
     const n = Number(v.replace(/[^0-9.-]/g, ""));
     return Number.isFinite(n) ? n : null;
   }
-  if (typeof v === "object") return num(v.amount ?? v.value ?? v.quantity ?? v.availToSellQty ?? v.availableToSellQty);
+  if (typeof v === "object") return num(v.amount ?? v.value ?? v.quantity ?? v.availToSellQty ?? v.availableToSellQty ?? v.availableUnits ?? v.onhandUnits);
   return null;
 };
 
@@ -28,6 +28,22 @@ async function allItems() {
   return out;
 }
 
+function inventoryRows(r: AnyObj): AnyObj[] {
+  const candidates = [
+    r?.elements,
+    r?.inventory,
+    r?.inventories,
+    r?.payload?.elements,
+    r?.payload?.inventory,
+    r?.payload?.inventories,
+    r?.data?.elements,
+    r?.data?.inventory,
+    r?.data?.inventories,
+  ];
+  for (const c of candidates) if (Array.isArray(c)) return c;
+  return [];
+}
+
 async function allInventories() {
   const out: AnyObj[] = [];
   let cursor: string | null = null;
@@ -37,20 +53,49 @@ async function allInventories() {
       : "/v3/inventories?limit=50";
     const r = await walmartRequest<any>(requestPath).catch(() => null);
     if (!r) break;
-    const rows = Array.isArray(r?.elements) ? r.elements : Array.isArray(r?.inventory) ? r.inventory : Array.isArray(r?.inventories) ? r.inventories : [];
+    const rows = inventoryRows(r);
     out.push(...rows);
-    const next: unknown = r?.nextCursor ?? r?.meta?.nextCursor;
+    const next: unknown = r?.nextCursor ?? r?.meta?.nextCursor ?? r?.payload?.nextCursor ?? r?.data?.nextCursor;
     if (!next || !rows.length || String(next) === cursor) break;
     cursor = String(next);
   }
   return out;
 }
 
+function rowSku(row: AnyObj): string {
+  return String(
+    row?.sku ??
+    row?.SKU ??
+    row?.itemSku ??
+    row?.itemSKU ??
+    row?.itemInformation?.sku ??
+    row?.item?.sku ??
+    row?.identifier?.sku ??
+    ""
+  ).toUpperCase();
+}
+
 function inventoryQty(row: AnyObj): number {
-  const direct = num(row?.quantity ?? row?.availableToSellQty ?? row?.availToSellQty ?? row?.inventoryCount);
+  const direct = num(
+    row?.quantity ??
+    row?.availableToSellQty ??
+    row?.availToSellQty ??
+    row?.inventoryCount ??
+    row?.inventoryData?.availableUnits ??
+    row?.inventoryData?.onhandUnits
+  );
   if (direct != null) return direct;
   const nodes = row?.shipNodes ?? row?.nodes ?? row?.inventory ?? row?.inventories;
-  if (Array.isArray(nodes)) return nodes.reduce((sum: number, node: AnyObj) => sum + (num(node?.availToSellQty ?? node?.availableToSellQty ?? node?.quantity ?? node?.amount) ?? 0), 0);
+  if (Array.isArray(nodes)) {
+    return nodes.reduce((sum: number, node: AnyObj) => sum + (num(
+      node?.availToSellQty ??
+      node?.availableToSellQty ??
+      node?.quantity ??
+      node?.amount ??
+      node?.inventoryData?.availableUnits ??
+      node?.inventoryData?.onhandUnits
+    ) ?? 0), 0);
+  }
   return 0;
 }
 
@@ -77,7 +122,7 @@ export async function getWalmartActiveProductHealth() {
   const offerMap = new Map(offers.map((o) => [String(o.sku ?? o.SKU ?? "").toUpperCase(), o]));
   const inventoryMap = new Map<string, number>();
   for (const row of inventories) {
-    const sku = String(row?.sku ?? row?.SKU ?? row?.itemSku ?? "").toUpperCase();
+    const sku = rowSku(row);
     if (!sku) continue;
     inventoryMap.set(sku, (inventoryMap.get(sku) ?? 0) + inventoryQty(row));
   }
@@ -90,8 +135,12 @@ export async function getWalmartActiveProductHealth() {
     })
     .map((i) => {
       const sku = String(i.sku ?? "");
-      const o = offerMap.get(sku.toUpperCase());
-      const inventory = inventoryMap.has(sku.toUpperCase()) ? inventoryMap.get(sku.toUpperCase())! : null;
+      const key = sku.toUpperCase();
+      const o = offerMap.get(key);
+      const inventoryFromBulk = inventoryMap.has(key) ? inventoryMap.get(key)! : null;
+      const inventoryFromOffer = num(o?.inventoryCount ?? o?.availableToSellQty ?? o?.quantity ?? o?.availableUnits);
+      const inventoryFromItem = num(i?.inventoryCount ?? i?.availableToSellQty ?? i?.quantity);
+      const inventory = inventoryFromBulk ?? inventoryFromOffer ?? inventoryFromItem;
       const buyBox = num(o?.buyBoxWinRate);
       const traffic = o?.traffic ? String(o.traffic).toUpperCase() : null;
       const competitive = o?.priceCompetitive == null ? null : Boolean(o.priceCompetitive);
@@ -106,6 +155,9 @@ export async function getWalmartActiveProductHealth() {
       } else if (inventory != null && inventory <= 3) {
         health = "YELLOW";
         reasons.push(`Low inventory (${inventory})`);
+      } else if (inventory == null) {
+        health = "YELLOW";
+        reasons.push("Inventory unavailable");
       }
       if (buyBox != null && buyBox < 10) {
         health = "RED";
