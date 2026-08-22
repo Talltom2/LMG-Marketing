@@ -6,6 +6,7 @@ import { requireInternalSecret } from "@/lib/internal-auth";
 type MetricInput = {
   date: string;
   sku?: string;
+  source?: string;
   sessions?: number;
   productViews?: number;
   addToCarts?: number;
@@ -21,6 +22,21 @@ function utcDay(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid date: ${value}`);
   return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+}
+
+function normalizeSource(value: unknown) {
+  const raw = String(value ?? "direct").trim().toLowerCase();
+  if (!raw || raw === "(direct)" || raw === "none") return "direct";
+  if (raw.includes("pinterest") || raw === "pin") return "pinterest";
+  if (raw.includes("tiktok") || raw.includes("tik tok")) return "tiktok";
+  if (raw.includes("instagram") || raw === "ig") return "instagram";
+  if (raw.includes("facebook") || raw === "fb" || raw.includes("meta")) return "facebook";
+  if (raw.includes("bing") || raw.includes("microsoft")) return "bing";
+  if (raw.includes("google")) return "google";
+  if (raw.includes("email") || raw.includes("newsletter") || raw.includes("mail")) return "email";
+  if (raw.includes("organic")) return "organic";
+  if (raw.includes("referral") || raw.includes("referrer")) return "referral";
+  return raw.replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "other";
 }
 
 export async function POST(request: NextRequest) {
@@ -43,6 +59,7 @@ export async function POST(request: NextRequest) {
       for (const item of metrics) {
         const date = utcDay(item.date);
         const cleanSku = String(item.sku ?? "").trim();
+        const trafficSource = normalizeSource(item.source);
         const product = cleanSku
           ? await db.product.upsert({
               where: { sku: cleanSku },
@@ -51,10 +68,11 @@ export async function POST(request: NextRequest) {
             })
           : null;
 
+        const metricSource = `lmg-analytics:${trafficSource}`;
         await db.funnelMetric.deleteMany({
           where: {
             date,
-            source: "lmg-analytics",
+            source: metricSource,
             channelId: channel.id,
             productId: product?.id ?? null,
           },
@@ -63,7 +81,7 @@ export async function POST(request: NextRequest) {
         await db.funnelMetric.create({
           data: {
             date,
-            source: "lmg-analytics",
+            source: metricSource,
             channelId: channel.id,
             productId: product?.id ?? null,
             sessions: asInt(item.sessions),
