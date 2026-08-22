@@ -21,11 +21,13 @@ export async function getTikTokProductHealth(){
 }
 
 export async function diagnoseTikTokProduct(sku:string){
- const base=await diagnoseWebsiteProduct(sku);const source=(base.sourceBreakdown??[]).find((x:any)=>x.source==="tiktok")??null;const findings=[...base.findings];
+ const base=await diagnoseWebsiteProduct(sku);
+ const source=(base.sourceBreakdown??[]).find((x:any)=>x.source==="tiktok")??null;
+ const findings=[...base.findings];
  if(!catalogConnected())findings.push({layer:"CATALOG_HEALTH",severity:"WARNING",title:"TikTok catalog is not connected",observation:"LMG Marketing has no TikTok catalog ID configured.",recommendation:"Connect the WooCommerce/TikTok catalog and validate product synchronization before diagnosing item eligibility.",confidence:1});
  if(!pixelConnected())findings.push({layer:"CONVERSION",severity:"WARNING",title:"TikTok Pixel is not connected",observation:"No TIKTOK_PIXEL_ID is configured.",recommendation:"Connect and validate the TikTok Pixel for browser-side ecommerce events.",confidence:1});
  if(!eventsConnected())findings.push({layer:"CONVERSION",severity:"WARNING",title:"TikTok Events API is not connected",observation:"No server-side TikTok Events API credential is configured.",recommendation:"Connect Events API so conversion tracking is resilient to browser loss and can be compared against Pixel events.",confidence:1});
- if(source?.productViews>=20&&source?.purchases===0)findings.push({layer:"CONVERSION",severity:"WARNING",title:"TikTok traffic is not converting",observation:`${source.productViews} TikTok-attributed product views produced no purchases in the last 7 days.`,recommendation:"Review TikTok creative-message match, landing-page relevance, price/offer, shipping and checkout friction before increasing TikTok traffic.",confidence:.93});
+ if(source&&source.productViews>=20&&source.purchases===0)findings.push({layer:"CONVERSION",severity:"WARNING",title:"TikTok traffic is not converting",observation:`${source.productViews} TikTok-attributed product views produced no purchases in the last 7 days.`,recommendation:"Review TikTok creative-message match, landing-page relevance, price/offer, shipping and checkout friction before increasing TikTok traffic.",confidence:.93});
  let health:Health=base.health;if(findings.some((f:any)=>f.severity==="CRITICAL"))health="RED";else if(findings.length&&health!=="RED")health="YELLOW";
  return{...base,health,tiktok:{catalogConnected:catalogConnected(),pixelConnected:pixelConnected(),eventsConnected:eventsConnected(),shopConnected:shopConnected(),sourcePerformance:source},findings};
 }
