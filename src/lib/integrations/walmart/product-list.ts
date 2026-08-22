@@ -32,12 +32,14 @@ async function allInventories() {
   const out: AnyObj[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 100; page++) {
-    const path = cursor ? `/v3/inventories?limit=50&nextCursor=${encodeURIComponent(cursor)}` : "/v3/inventories?limit=50";
-    const r = await walmartRequest<any>(path).catch(() => null);
+    const requestPath: string = cursor
+      ? `/v3/inventories?limit=50&nextCursor=${encodeURIComponent(cursor)}`
+      : "/v3/inventories?limit=50";
+    const r = await walmartRequest<any>(requestPath).catch(() => null);
     if (!r) break;
     const rows = Array.isArray(r?.elements) ? r.elements : Array.isArray(r?.inventory) ? r.inventory : Array.isArray(r?.inventories) ? r.inventories : [];
     out.push(...rows);
-    const next = r?.nextCursor ?? r?.meta?.nextCursor;
+    const next: unknown = r?.nextCursor ?? r?.meta?.nextCursor;
     if (!next || !rows.length || String(next) === cursor) break;
     cursor = String(next);
   }
