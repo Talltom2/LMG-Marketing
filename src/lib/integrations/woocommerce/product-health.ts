@@ -1,0 +1,37 @@
+import { db } from "@/lib/db";
+import { wooRequest } from "./client";
+
+type WooProduct={id:number;name:string;sku:string;status:string;stock_status:string;stock_quantity:number|null;price:string;regular_price:string;sale_price:string;catalog_visibility:string;type:string;permalink?:string};
+type Funnel={sessions:number;productViews:number;addToCarts:number;checkoutStarts:number;purchases:number;revenue:number};
+export type WebsiteProductHealth="GREEN"|"YELLOW"|"RED";
+
+const zero=():Funnel=>({sessions:0,productViews:0,addToCarts:0,checkoutStarts:0,purchases:0,revenue:0});
+const n=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
+async function allPublished(){const out:WooProduct[]=[];for(let page=1;page<=100;page++){const rows=await wooRequest<WooProduct[]>("/products",{per_page:100,page,status:"publish"});out.push(...rows);if(rows.length<100)break;}return out;}
+function healthFor(p:WooProduct,f:Funnel,telemetry:boolean){const reasons:string[]=[];let health:WebsiteProductHealth="GREEN";if(p.stock_status==="outofstock"||p.stock_quantity===0){health="RED";reasons.push("Out of stock");}if(p.catalog_visibility==="hidden"){health="RED";reasons.push("Hidden from catalog");}if(!String(p.sku??"").trim()){health="RED";reasons.push("Missing SKU");}if(health!=="RED"&&p.stock_quantity!=null&&p.stock_quantity>0&&p.stock_quantity<=3){health="YELLOW";reasons.push("Low stock");}if(!telemetry&&health!=="RED"){health="YELLOW";reasons.push("No product funnel telemetry");}if(telemetry&&f.productViews>=20&&f.purchases===0&&health!=="RED"){health="YELLOW";reasons.push("Views without purchases");}if(telemetry&&f.addToCarts>=3&&f.checkoutStarts===0&&health!=="RED"){health="YELLOW";reasons.push("Cart-to-checkout dropoff");}return{health,reasons};}
+
+export async function getWebsiteProductHealth(){
+ const products=await allPublished();
+ const skus=products.map(p=>String(p.sku??"").trim()).filter(Boolean);
+ const dbProducts=skus.length?await db.product.findMany({where:{sku:{in:skus}},select:{id:true,sku:true}}):[];
+ const bySku=new Map(dbProducts.map(p=>[p.sku,p.id]));
+ const ids=dbProducts.map(p=>p.id);const since=new Date(Date.now()-7*86400000);
+ const metrics=ids.length?await db.funnelMetric.findMany({where:{source:"lmg-analytics",date:{gte:since},productId:{in:ids}},select:{productId:true,sessions:true,productViews:true,addToCarts:true,checkoutStarts:true,purchases:true,revenue:true}}):[];
+ const agg=new Map<string,Funnel>();for(const m of metrics){if(!m.productId)continue;const a=agg.get(m.productId)??zero();a.sessions+=m.sessions;a.productViews+=m.productViews;a.addToCarts+=m.addToCarts;a.checkoutStarts+=m.checkoutStarts;a.purchases+=m.purchases;a.revenue+=Number(m.revenue);agg.set(m.productId,a);}
+ const rows=products.map(p=>{const id=bySku.get(String(p.sku??"").trim());const funnel=id?agg.get(id)??zero():zero();const telemetry=Boolean(id&&agg.has(id));const diagnosis=healthFor(p,funnel,telemetry);const conversion=funnel.productViews>0?funnel.purchases/funnel.productViews:null;const cartRate=funnel.productViews>0?funnel.addToCarts/funnel.productViews:null;const checkoutRate=funnel.addToCarts>0?funnel.checkoutStarts/funnel.addToCarts:null;return{id:p.id,sku:p.sku,name:p.name,price:p.price?n(p.price):null,stock:p.stock_quantity,stockStatus:p.stock_status,visibility:p.catalog_visibility,permalink:p.permalink??null,health:diagnosis.health,reasons:diagnosis.reasons,telemetryAvailable:telemetry,funnel:{...funnel,conversion,cartRate,checkoutRate}};}).sort((a,b)=>({RED:0,YELLOW:1,GREEN:2}[a.health]-({RED:0,YELLOW:1,GREEN:2}[b.health])||a.name.localeCompare(b.name));
+ return{summary:{active:rows.length,red:rows.filter(x=>x.health==="RED").length,yellow:rows.filter(x=>x.health==="YELLOW").length,green:rows.filter(x=>x.health==="GREEN").length,withTelemetry:rows.filter(x=>x.telemetryAvailable).length},products:rows};
+}
+
+export async function diagnoseWebsiteProduct(sku:string){
+ const clean=sku.trim();if(!clean)throw new Error("SKU is required.");
+ const found=await wooRequest<WooProduct[]>("/products",{sku:clean,per_page:10});const p=found[0];if(!p)throw new Error(`WooCommerce could not find SKU ${clean}.`);
+ const dbProduct=await db.product.findUnique({where:{sku:clean},select:{id:true}});const since=new Date(Date.now()-7*86400000);const metrics=dbProduct?await db.funnelMetric.findMany({where:{source:"lmg-analytics",date:{gte:since},productId:dbProduct.id},select:{sessions:true,productViews:true,addToCarts:true,checkoutStarts:true,purchases:true,revenue:true}}):[];
+ const f=metrics.reduce((a,m)=>{a.sessions+=m.sessions;a.productViews+=m.productViews;a.addToCarts+=m.addToCarts;a.checkoutStarts+=m.checkoutStarts;a.purchases+=m.purchases;a.revenue+=Number(m.revenue);return a},zero());const telemetry=metrics.length>0;const diag=healthFor(p,f,telemetry);const conversion=f.productViews>0?f.purchases/f.productViews:null;const targetMin=conversion&&conversion>0?Math.ceil(4/conversion):null;const targetMax=conversion&&conversion>0?Math.ceil(6/conversion):null;
+ const findings:Array<{layer:string;severity:"CRITICAL"|"WARNING"|"WATCH";title:string;observation:string;recommendation:string;confidence:number}>=[];
+ if(p.stock_status==="outofstock"||p.stock_quantity===0)findings.push({layer:"INVENTORY",severity:"CRITICAL",title:"Product is out of stock",observation:"WooCommerce reports zero available inventory.",recommendation:"Replenish inventory or retire the product.",confidence:.99});
+ if(p.catalog_visibility==="hidden")findings.push({layer:"CATALOG",severity:"CRITICAL",title:"Product is hidden from catalog",observation:"Catalog visibility is set to hidden.",recommendation:"Restore visible catalog/search placement unless intentionally hidden.",confidence:.99});
+ if(!telemetry)findings.push({layer:"DATA_GAP",severity:"WATCH",title:"Product funnel telemetry is not yet available",observation:"No SKU-level LMG Analytics records were found in the last 7 days.",recommendation:"Confirm the LMG Analytics export is sending this SKU with product views, carts, checkout starts and purchases.",confidence:1});
+ if(telemetry&&f.productViews>=20&&f.purchases===0)findings.push({layer:"CONVERSION",severity:"WARNING",title:"Traffic is not converting",observation:`${f.productViews} product views produced no purchases in the last 7 days.`,recommendation:"Review price, images, copy, shipping promise, trust signals and checkout friction before buying more traffic.",confidence:.9});
+ if(telemetry&&f.addToCarts>=3&&f.checkoutStarts===0)findings.push({layer:"CHECKOUT",severity:"WARNING",title:"Cart-to-checkout dropoff",observation:`${f.addToCarts} add-to-carts produced no checkout starts.`,recommendation:"Inspect cart page, shipping costs, payment messaging and checkout links.",confidence:.92});
+ return{sku:p.sku,name:p.name,id:p.id,health:diag.health,summary:{status:p.status,visibility:p.catalog_visibility,stock:p.stock_quantity,stockStatus:p.stock_status,currentPrice:p.price?n(p.price):null,regularPrice:p.regular_price?n(p.regular_price):null,salePrice:p.sale_price?n(p.sale_price):null,permalink:p.permalink??null},funnel:{...f,conversion,cartRate:f.productViews>0?f.addToCarts/f.productViews:null,checkoutRate:f.addToCarts>0?f.checkoutStarts/f.addToCarts:null,purchaseFromCheckout:f.checkoutStarts>0?f.purchases/f.checkoutStarts:null,revenuePerView:f.productViews>0?f.revenue/f.productViews:null},trafficTarget:{minUnitsPerDay:4,maxUnitsPerDay:6,minDailyVisits:targetMin,maxDailyVisits:targetMax},findings};
+}
