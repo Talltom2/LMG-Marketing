@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 import ZeroInventoryActions from "./ZeroInventoryActions";
 
@@ -14,6 +13,7 @@ export default function WalmartProductHealthList(){
   const[error,setError]=useState("");
   useEffect(()=>{fetch("/api/integrations/walmart/products",{cache:"no-store"}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error(b.message);setProducts(b.products??[]);setSummary(b.summary??null)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load products.")).finally(()=>setLoading(false));},[]);
   const counts=useMemo(()=>({total:products.length,red:products.filter(p=>p.health==="RED").length,yellow:products.filter(p=>p.health==="YELLOW").length,green:products.filter(p=>p.health==="GREEN").length}),[products]);
+  function openProduct(sku:string){window.location.assign(`/diagnostics/product?sku=${encodeURIComponent(sku)}`);}
   return <section className="panel" style={{display:"block",width:"100%"}}>
     <style>{`.walmart-product-scroll{scrollbar-width:auto;scrollbar-color:#777 #e8e8e8}.walmart-product-scroll::-webkit-scrollbar{width:18px}.walmart-product-scroll::-webkit-scrollbar-track{background:#e8e8e8;border-radius:10px}.walmart-product-scroll::-webkit-scrollbar-thumb{background:#777;border:3px solid #e8e8e8;border-radius:10px}.walmart-product-scroll::-webkit-scrollbar-thumb:hover{background:#555}`}</style>
     <div style={{width:"100%",minWidth:0}}>
@@ -25,7 +25,7 @@ export default function WalmartProductHealthList(){
         <div style={{width:"100%",display:"grid",gap:8}}>
           {!loading&&products.map(p=><article key={p.sku} style={{display:"grid",gridTemplateColumns:"18px minmax(250px,2.4fr) 76px 76px 82px minmax(130px,.95fr) minmax(220px,1.2fr)",gap:8,alignItems:"center",padding:"11px 8px",border:"1px solid #ddd",borderRadius:8,width:"100%",boxSizing:"border-box",fontSize:".96rem"}}>
             <span title={p.health} style={{width:15,height:15,borderRadius:"50%",background:color(p.health),display:"inline-block"}}/>
-            <div style={{minWidth:0}}><Link href={`/diagnostics/product?sku=${encodeURIComponent(p.sku)}`} style={{textDecoration:"none",color:"inherit"}}><strong style={{display:"block",lineHeight:1.22}}>{p.name}</strong><small style={{display:"block",marginTop:3,lineHeight:1.2}}>{p.sku}{p.productType?` · ${p.productType}`:""}</small></Link></div>
+            <button type="button" onClick={()=>openProduct(p.sku)} style={{minWidth:0,textAlign:"left",border:0,background:"transparent",padding:0,color:"inherit",cursor:"pointer",font:"inherit"}}><strong style={{display:"block",lineHeight:1.22}}>{p.name}</strong><small style={{display:"block",marginTop:3,lineHeight:1.2,textDecoration:"underline"}}>{p.sku}{p.productType?` · ${p.productType}`:""}</small></button>
             <div>Inventory<br/><strong>{p.inventory==null?"N/A":p.inventory}</strong></div>
             <div>Traffic<br/><strong>{p.traffic??"—"}</strong></div>
             <div>Buy Box<br/><strong>{p.buyBoxWinRate==null?"—":`${p.buyBoxWinRate.toFixed(1)}%`}</strong></div>
