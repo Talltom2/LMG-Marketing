@@ -11,68 +11,11 @@ export type WalmartDiagnosticSnapshot = {
 };
 
 type AnyObj = Record<string, any>;
-
-function asArray(value: any): AnyObj[] {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== "object") return [];
-  for (const key of ["items", "ItemResponse", "itemResponse", "inventory", "inventories", "elements", "records", "data"]) if (Array.isArray(value[key])) return value[key];
-  return [];
-}
-function numberValue(v: any): number {
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  if (typeof v === "string") { const n = Number(v.replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; }
-  if (v && typeof v === "object") return numberValue(v.amount ?? v.value ?? v.quantity ?? 0);
-  return 0;
-}
-async function getAllItems(): Promise<AnyObj[]> {
-  const out: AnyObj[] = []; let cursor: string | undefined = "*";
-  for (let page=0; page<100; page++) {
-    const qs=new URLSearchParams({limit:"50",nextCursor:cursor});
-    const response=await walmartRequest<AnyObj>(`/v3/items?${qs.toString()}`);
-    const rows=asArray(response?.ItemResponse ?? response?.itemResponse ?? response?.payload ?? response);
-    out.push(...rows);
-    const next=response?.nextCursor ?? response?.meta?.nextCursor;
-    if(!next || rows.length===0 || String(next)===cursor) break;
-    cursor=String(next);
-  }
-  return out;
-}
-async function getAllInventories(): Promise<AnyObj[]> {
-  const out: AnyObj[]=[]; let cursor:string|undefined;
-  for(let page=0;page<100;page++){
-    const qs=new URLSearchParams({limit:"50"}); if(cursor) qs.set("nextCursor",cursor);
-    const response=await walmartRequest<AnyObj>(`/v3/inventories?${qs.toString()}`);
-    const rows=asArray(response?.elements ?? response?.inventory ?? response?.inventories ?? response);
-    out.push(...rows);
-    const next=response?.nextCursor ?? response?.meta?.nextCursor; if(!next||rows.length===0||String(next)===cursor) break; cursor=String(next);
-  }
-  return out;
-}
-async function getPricingInsights(): Promise<AnyObj[]> {
-  const out:AnyObj[]=[];
-  for(let pageNumber=0;pageNumber<100;pageNumber++){
-    const response=await walmartRequest<AnyObj>("/v3/price/getPricingInsights",{method:"POST",body:JSON.stringify({pageNumber})});
-    const data=response?.data??response; const rows=data?.pricingInsightsResponseList??[]; if(!Array.isArray(rows)||rows.length===0) break; out.push(...rows);
-    const ctx=data?.pageContext; if(ctx&&typeof ctx.totalPages==="number"&&pageNumber+1>=ctx.totalPages) break; if(rows.length<20&&!ctx) break;
-  }
-  return out;
-}
-function publishStatus(item:AnyObj):string { const p=item.publishedStatus; if(p&&typeof p==="object") return String(p.status??"UNKNOWN").toUpperCase(); return String(p??item.publishStatus??item.lifecycleStatus??item.status??"UNKNOWN").toUpperCase(); }
-function inventoryQty(item:AnyObj):number {
-  if(item.quantity!=null) return numberValue(item.quantity); if(item.availableToSellQty!=null) return numberValue(item.availableToSellQty); if(item.inventoryCount!=null) return numberValue(item.inventoryCount);
-  const nodes=item.shipNodes??item.nodes??item.inventory??item.inventories; if(Array.isArray(nodes)) return nodes.reduce((s:number,n:AnyObj)=>s+numberValue(n.availToSellQty??n.quantity??n.amount??n.inventory),0);
-  return numberValue(item.amount??item.inventory);
-}
-export async function getWalmartDiagnosticSnapshot():Promise<WalmartDiagnosticSnapshot>{
-  const [items,inventories,pricing]=await Promise.all([getAllItems(),getAllInventories(),getPricingInsights()]);
-  const catalog={total:items.length,published:0,unpublished:0,systemProblem:0,unknown:0};
-  for(const item of items){const status=publishStatus(item);if(status.includes("PUBLISHED")&&!status.includes("UNPUBLISHED"))catalog.published++;else if(status.includes("SYSTEM_PROBLEM")||status.includes("SYSTEM_ERROR")||status.includes("ERROR"))catalog.systemProblem++;else if(status.includes("UNPUBLISHED")||status.includes("STAGE")||status.includes("IN_PROGRESS")||status.includes("INPROGRESS")||status.includes("READY_TO_PUBLISH"))catalog.unpublished++;else catalog.unknown++;}
-  const inventory={totalSkus:inventories.length,outOfStock:0,lowStock:0,totalUnits:0};
-  for(const row of inventories){const qty=inventoryQty(row); if(qty>=0&&qty<1000000) inventory.totalUnits+=qty; if(qty<=0)inventory.outOfStock++;else if(qty<=3)inventory.lowStock++;}
-  let buyBoxSum=0,buyBoxCount=0; const offer={total:pricing.length,losingBuyBox:0,uncompetitive:0,walmartFulfilled:0,sellerFulfilled:0,avgBuyBoxWinRate:null as number|null};
-  const visibility={veryLow:0,low:0,medium:0,high:0,veryHigh:0,unknown:0}; const demand={gmv30:0,inDemand:0};
-  for(const row of pricing){const win=row.buyBoxWinRate==null?null:numberValue(row.buyBoxWinRate);if(win!=null){buyBoxSum+=win;buyBoxCount++;if(win<50)offer.losingBuyBox++;}if(row.priceCompetitive===false||(row.priceCompetitiveScore!=null&&numberValue(row.priceCompetitiveScore)<70))offer.uncompetitive++;const fulfillment=String(row.fulfillment??"").toUpperCase();if(fulfillment.includes("WALMART"))offer.walmartFulfilled++;else if(fulfillment)offer.sellerFulfilled++;const traffic=String(row.traffic??"UNKNOWN").toUpperCase();if(traffic==="VERY_LOW")visibility.veryLow++;else if(traffic==="LOW")visibility.low++;else if(traffic==="MEDIUM")visibility.medium++;else if(traffic==="HIGH")visibility.high++;else if(traffic==="VERY_HIGH")visibility.veryHigh++;else visibility.unknown++;demand.gmv30+=numberValue(row.gmv30??row.gmvL30D);if(row.inDemand===true||row.isInDemand===true)demand.inDemand++;}
-  offer.avgBuyBoxWinRate=buyBoxCount?buyBoxSum/buyBoxCount:null;
-  const samples=pricing.slice(0,20).map((row:AnyObj)=>({sku:String(row.sku??row.SKU??""),name:row.itemName??row.productName,publishStatus:row.itemPublishStatus??row.publishStatus,inventory:row.inventoryCount==null?undefined:numberValue(row.inventoryCount),buyBoxWinRate:row.buyBoxWinRate==null?null:numberValue(row.buyBoxWinRate),traffic:row.traffic??null,fulfillment:row.fulfillment??null,priceCompetitive:row.priceCompetitive??null,gmv30:row.gmv30==null?null:numberValue(row.gmv30)})).filter((r:any)=>r.sku);
-  return {catalog,inventory,offer,visibility,demand,generatedAt:new Date().toISOString(),samples};
-}
+function asArray(value: any): AnyObj[] { if (Array.isArray(value)) return value; if (!value || typeof value !== "object") return []; for (const key of ["items","ItemResponse","itemResponse","inventory","inventories","elements","records","data"]) if (Array.isArray(value[key])) return value[key]; return []; }
+function numberValue(v:any):number { if(typeof v==="number") return Number.isFinite(v)?v:0; if(typeof v==="string"){const n=Number(v.replace(/[^0-9.-]/g,""));return Number.isFinite(n)?n:0;} if(v&&typeof v==="object")return numberValue(v.amount??v.value??v.quantity??0); return 0; }
+async function getAllItems():Promise<AnyObj[]>{const out:AnyObj[]=[];let cursor:string|undefined="*";for(let page=0;page<100;page++){const qs=new URLSearchParams({limit:"50",nextCursor:cursor??"*"});const response=await walmartRequest<AnyObj>(`/v3/items?${qs.toString()}`);const rows=asArray(response?.ItemResponse??response?.itemResponse??response?.payload??response);out.push(...rows);const next=response?.nextCursor??response?.meta?.nextCursor;if(!next||rows.length===0||String(next)===cursor)break;cursor=String(next);}return out;}
+async function getAllInventories():Promise<AnyObj[]>{const out:AnyObj[]=[];let cursor:string|undefined;for(let page=0;page<100;page++){const qs=new URLSearchParams({limit:"50"});if(cursor)qs.set("nextCursor",cursor);const response=await walmartRequest<AnyObj>(`/v3/inventories?${qs.toString()}`);const rows=asArray(response?.elements??response?.inventory??response?.inventories??response);out.push(...rows);const next=response?.nextCursor??response?.meta?.nextCursor;if(!next||rows.length===0||String(next)===cursor)break;cursor=String(next);}return out;}
+async function getPricingInsights():Promise<AnyObj[]>{const out:AnyObj[]=[];for(let pageNumber=0;pageNumber<100;pageNumber++){const response=await walmartRequest<AnyObj>("/v3/price/getPricingInsights",{method:"POST",body:JSON.stringify({pageNumber})});const data=response?.data??response;const rows=data?.pricingInsightsResponseList??[];if(!Array.isArray(rows)||rows.length===0)break;out.push(...rows);const ctx=data?.pageContext;if(ctx&&typeof ctx.totalPages==="number"&&pageNumber+1>=ctx.totalPages)break;if(rows.length<20&&!ctx)break;}return out;}
+function publishStatus(item:AnyObj):string{const p=item.publishedStatus;if(p&&typeof p==="object")return String(p.status??"UNKNOWN").toUpperCase();return String(p??item.publishStatus??item.lifecycleStatus??item.status??"UNKNOWN").toUpperCase();}
+function inventoryQty(item:AnyObj):number{if(item.quantity!=null)return numberValue(item.quantity);if(item.availableToSellQty!=null)return numberValue(item.availableToSellQty);if(item.inventoryCount!=null)return numberValue(item.inventoryCount);const nodes=item.shipNodes??item.nodes??item.inventory??item.inventories;if(Array.isArray(nodes))return nodes.reduce((s:number,n:AnyObj)=>s+numberValue(n.availToSellQty??n.quantity??n.amount??n.inventory),0);return numberValue(item.amount??item.inventory);}
+export async function getWalmartDiagnosticSnapshot():Promise<WalmartDiagnosticSnapshot>{const[items,inventories,pricing]=await Promise.all([getAllItems(),getAllInventories(),getPricingInsights()]);const catalog={total:items.length,published:0,unpublished:0,systemProblem:0,unknown:0};for(const item of items){const status=publishStatus(item);if(status.includes("PUBLISHED")&&!status.includes("UNPUBLISHED"))catalog.published++;else if(status.includes("SYSTEM_PROBLEM")||status.includes("SYSTEM_ERROR")||status.includes("ERROR"))catalog.systemProblem++;else if(status.includes("UNPUBLISHED")||status.includes("STAGE")||status.includes("IN_PROGRESS")||status.includes("INPROGRESS")||status.includes("READY_TO_PUBLISH"))catalog.unpublished++;else catalog.unknown++;}const inventory={totalSkus:inventories.length,outOfStock:0,lowStock:0,totalUnits:0};for(const row of inventories){const qty=inventoryQty(row);if(qty>=0&&qty<1000000)inventory.totalUnits+=qty;if(qty<=0)inventory.outOfStock++;else if(qty<=3)inventory.lowStock++;}let buyBoxSum=0,buyBoxCount=0;const offer={total:pricing.length,losingBuyBox:0,uncompetitive:0,walmartFulfilled:0,sellerFulfilled:0,avgBuyBoxWinRate:null as number|null};const visibility={veryLow:0,low:0,medium:0,high:0,veryHigh:0,unknown:0};const demand={gmv30:0,inDemand:0};for(const row of pricing){const win=row.buyBoxWinRate==null?null:numberValue(row.buyBoxWinRate);if(win!=null){buyBoxSum+=win;buyBoxCount++;if(win<50)offer.losingBuyBox++;}if(row.priceCompetitive===false||(row.priceCompetitiveScore!=null&&numberValue(row.priceCompetitiveScore)<70))offer.uncompetitive++;const fulfillment=String(row.fulfillment??"").toUpperCase();if(fulfillment.includes("WALMART"))offer.walmartFulfilled++;else if(fulfillment)offer.sellerFulfilled++;const traffic=String(row.traffic??"UNKNOWN").toUpperCase();if(traffic==="VERY_LOW")visibility.veryLow++;else if(traffic==="LOW")visibility.low++;else if(traffic==="MEDIUM")visibility.medium++;else if(traffic==="HIGH")visibility.high++;else if(traffic==="VERY_HIGH")visibility.veryHigh++;else visibility.unknown++;demand.gmv30+=numberValue(row.gmv30??row.gmvL30D);if(row.inDemand===true||row.isInDemand===true)demand.inDemand++;}offer.avgBuyBoxWinRate=buyBoxCount?buyBoxSum/buyBoxCount:null;const samples=pricing.slice(0,20).map((row:AnyObj)=>({sku:String(row.sku??row.SKU??""),name:row.itemName??row.productName,publishStatus:row.itemPublishStatus??row.publishStatus,inventory:row.inventoryCount==null?undefined:numberValue(row.inventoryCount),buyBoxWinRate:row.buyBoxWinRate==null?null:numberValue(row.buyBoxWinRate),traffic:row.traffic??null,fulfillment:row.fulfillment??null,priceCompetitive:row.priceCompetitive??null,gmv30:row.gmv30==null?null:numberValue(row.gmv30)})).filter((r:any)=>r.sku);return{catalog,inventory,offer,visibility,demand,generatedAt:new Date().toISOString(),samples};}
