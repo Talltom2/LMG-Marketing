@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 
 const sections = [
@@ -73,7 +74,8 @@ export default async function Home() {
       <header>
         <p className="eyebrow">Laughing Moose Gifts</p>
         <h1>Marketing Intelligence</h1>
-        <p className="subtitle">Data → Observation → Recommendation → Decision → Action → Result</p>
+        <p className="subtitle">Data → Observation → Diagnosis → Recommendation → Decision → Action → Result → Learning</p>
+        <p><Link href="/diagnostics">Open Diagnostic Center →</Link></p>
       </header>
 
       <section className="scorecards">
@@ -95,7 +97,7 @@ export default async function Home() {
           {revenue > 0 ? (
             <>
               <strong>Sellerchamp commerce data is live.</strong>
-              <p>{money(revenue)} in revenue and {units} units are recorded for the last seven days. Funnel intelligence will activate when LMG Analytics is connected.</p>
+              <p>{money(revenue)} in revenue and {units} units are recorded for the last seven days. The Diagnostic Center now compares channel performance with historical baselines; funnel diagnosis becomes more precise as LMG Analytics and marketplace telemetry are connected.</p>
             </>
           ) : (
             <>
