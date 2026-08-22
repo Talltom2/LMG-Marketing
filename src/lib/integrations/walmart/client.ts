@@ -5,6 +5,7 @@ type WalmartTokenResponse = {
 };
 
 const baseUrl = process.env.WALMART_API_BASE_URL ?? "https://marketplace.walmartapis.com";
+const serviceName = "LMG Marketing Intelligence";
 
 function getCredentials() {
   const clientId = process.env.WALMART_CLIENT_ID;
@@ -31,6 +32,8 @@ export async function getWalmartAccessToken(): Promise<WalmartTokenResponse> {
       Authorization: `Basic ${basic}`,
       Accept: "application/json",
       "Content-Type": "application/x-www-form-urlencoded",
+      "WM_SVC.NAME": serviceName,
+      "WM_QOS.CORRELATION_ID": crypto.randomUUID(),
     },
     body: new URLSearchParams({ grant_type: "client_credentials" }),
     cache: "no-store",
@@ -55,7 +58,7 @@ export async function walmartRequest<T>(path: string, init: RequestInit = {}): P
       "Content-Type": "application/json",
       "WM_SEC.ACCESS_TOKEN": token.access_token,
       "WM_QOS.CORRELATION_ID": correlationId,
-      "WM_SVC.NAME": "LMG Marketing Intelligence",
+      "WM_SVC.NAME": serviceName,
       ...(init.headers ?? {}),
     },
     cache: "no-store",
