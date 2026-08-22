@@ -2,18 +2,38 @@ import { walmartRequest } from "./client";
 
 export type ProductHealth="GREEN"|"YELLOW"|"RED";
 export type ProductFinding={layer:string;severity:"WARNING"|"CRITICAL"|"WATCH";title:string;observation:string;likelyCause:string;recommendation:string;confidence:number};
-
 type PricingResponse={data?:{pricingInsightsResponseList?:Array<any>}};
 
-export async function diagnoseWalmartProduct(sku:string){
- const clean=sku.trim(); if(!clean) throw new Error("SKU is required.");
+type Lookup={sku:string;item:any|null;pricing:any|null};
+const normalize=(v:string)=>v.toUpperCase().replace(/[^A-Z0-9]/g,"");
+function candidates(input:string){const clean=input.trim();const out=[clean];if(/^LMG/i.test(clean))out.push(clean.replace(/^LMG[-_ ]?/i,""));else out.push(`LMG${clean}`);return [...new Set(out.filter(Boolean))];}
+async function trySku(sku:string):Promise<Lookup>{
  const [itemResult,pricingResult]=await Promise.allSettled([
-  walmartRequest<any>(`/v3/items/${encodeURIComponent(clean)}?productIdType=SKU`),
-  walmartRequest<PricingResponse>("/v3/price/getPricingInsights",{method:"POST",body:JSON.stringify({searchCriteria:{searchField:"SKU",searchValue:[clean]}})})
+  walmartRequest<any>(`/v3/items/${encodeURIComponent(sku)}?productIdType=SKU`),
+  walmartRequest<PricingResponse>("/v3/price/getPricingInsights",{method:"POST",body:JSON.stringify({searchCriteria:{searchField:"SKU",searchValue:[sku]}})})
  ]);
  const item=itemResult.status==="fulfilled"?itemResult.value:null;
  const pricing=pricingResult.status==="fulfilled"?(pricingResult.value.data?.pricingInsightsResponseList?.[0]??null):null;
- if(!item&&!pricing) throw new Error(`Walmart did not return item data for SKU ${clean}.`);
+ return {sku,item,pricing};
+}
+async function resolveByCatalog(input:string):Promise<string|null>{
+ const target=normalize(input.replace(/^LMG/i,""));
+ for(let offset=0;offset<1000;offset+=50){
+  const response=await walmartRequest<any>(`/v3/items?limit=50&offset=${offset}`);
+  const rows=Array.isArray(response?.ItemResponse)?response.ItemResponse:[];
+  for(const row of rows){const candidate=String(row?.sku??"");const n=normalize(candidate);if(n===normalize(input)||n===target||normalize(candidate.replace(/^LMG/i,""))===target)return candidate;}
+  const total=Number(response?.totalItems??0);if(rows.length===0||(total&&offset+rows.length>=total))break;
+ }
+ return null;
+}
+
+export async function diagnoseWalmartProduct(sku:string){
+ const clean=sku.trim(); if(!clean) throw new Error("SKU is required.");
+ let lookup:Lookup|null=null;
+ for(const candidate of candidates(clean)){const result=await trySku(candidate);if(result.item||result.pricing){lookup=result;break;}}
+ if(!lookup){const resolved=await resolveByCatalog(clean);if(resolved)lookup=await trySku(resolved);}
+ if(!lookup||(!lookup.item&&!lookup.pricing)) throw new Error(`Walmart could not resolve ${clean} to a marketplace SKU. Try the Walmart SKU, UPC, or WPID shown in Seller Center.`);
+ const {item,pricing}=lookup; const resolvedSku=lookup.sku;
  const root=item?.ItemResponse?.[0]??item?.items?.[0]??item?.item??item;
  const publish=String(root?.publishedStatus??root?.publishedStatusName??root?.lifecycleStatus??pricing?.itemPublishStatus??"UNKNOWN").toUpperCase();
  const inventory=Number(pricing?.inventoryCount??root?.inventoryCount??NaN);
@@ -33,5 +53,5 @@ export async function diagnoseWalmartProduct(sku:string){
  if(traffic==="LOW"||traffic==="VERY_LOW") findings.push({layer:"VISIBILITY",severity:traffic==="VERY_LOW"?"WARNING":"WATCH",title:"Low Walmart traffic",observation:`Pricing Insights classifies traffic as ${traffic}.`,likelyCause:buyBox!=null&&buyBox<50?"Offer competitiveness/Buy Box loss may be suppressing effective exposure; discoverability may also contribute.":"Search discoverability, taxonomy, attributes, title/content, demand, or keyword coverage may be limiting exposure.",recommendation:"Request SKU-level Search Insights and inspect impressions/click/add-to-cart/sales ranks plus Walmart keyword recommendations.",confidence:.84});
  if(gmv30===0&&(!traffic||traffic==="LOW"||traffic==="VERY_LOW")) findings.push({layer:"DEMAND",severity:"WATCH",title:"No recent GMV signal",observation:"Pricing Insights shows no 30-day GMV for this SKU.",likelyCause:"The item may have insufficient exposure, weak conversion, or limited recent demand.",recommendation:"Use Item Performance history to separate a traffic problem from a conversion problem before changing content or price.",confidence:.72});
  const health:ProductHealth=findings.some(f=>f.severity==="CRITICAL")?"RED":findings.length?"YELLOW":"GREEN";
- return {sku:clean,name:pricing?.itemName??root?.productName??root?.itemName??clean,health,summary:{publishStatus:publish,inventory:Number.isFinite(inventory)?inventory:null,buyBoxWinRate:buyBox,traffic,priceCompetitive:competitive,currentPrice,suggestedPrice,fulfillment,gmv30},findings,evidenceGaps:{searchInsights:true,itemPerformance:true},nextEvidence:"Run SKU-filtered Search Insights and Item Performance reports for historical visibility, conversion, keyword and sales evidence."};
+ return {requestedSku:clean,sku:resolvedSku,resolvedSku:resolvedSku!==clean?resolvedSku:null,name:pricing?.itemName??root?.productName??root?.itemName??resolvedSku,health,summary:{publishStatus:publish,inventory:Number.isFinite(inventory)?inventory:null,buyBoxWinRate:buyBox,traffic,priceCompetitive:competitive,currentPrice,suggestedPrice,fulfillment,gmv30},findings,evidenceGaps:{searchInsights:true,itemPerformance:true},nextEvidence:"Run SKU-filtered Search Insights and Item Performance reports for historical visibility, conversion, keyword and sales evidence."};
 }
