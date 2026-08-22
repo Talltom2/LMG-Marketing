@@ -14,6 +14,39 @@ const severityLabel: Record<DiagnosticSeverity, string> = {
 const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${(value * 100).toFixed(0)}%`;
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 
+function trafficState(severity: DiagnosticSeverity) {
+  if (severity === "CRITICAL") return "RED";
+  if (severity === "HEALTHY") return "GREEN";
+  return "YELLOW";
+}
+
+function TrafficLight({ severity }: { severity: DiagnosticSeverity }) {
+  const state = trafficState(severity);
+  const dot = (color: "RED" | "YELLOW" | "GREEN", background: string) => (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        display: "inline-block",
+        background: state === color ? background : "#d1d5db",
+        border: "1px solid rgba(0,0,0,.12)",
+        boxShadow: state === color ? `0 0 0 3px ${background}22` : "none",
+      }}
+    />
+  );
+
+  return (
+    <div aria-label={`${state.toLowerCase()} platform status`} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+      {dot("RED", "#dc2626")}
+      {dot("YELLOW", "#eab308")}
+      {dot("GREEN", "#16a34a")}
+      <strong style={{ marginLeft: 4 }}>{state}</strong>
+    </div>
+  );
+}
+
 export default async function DiagnosticsPage() {
   const report = await runDiagnosticEngine(7);
   const actionable = report.findings.filter((finding) => finding.severity !== "HEALTHY");
@@ -35,12 +68,14 @@ export default async function DiagnosticsPage() {
         <div className="empty-state">
           <strong>{actionable.length} diagnostic signals detected</strong>
           <p>The engine compares the latest seven days with the preceding seven-day baseline, then uses funnel evidence to distinguish visibility/traffic loss from conversion deterioration when the data is available.</p>
+          <p><strong>Traffic lights:</strong> Green = healthy, Yellow = watch/warning/data gap, Red = critical.</p>
         </div>
       </section>
 
       <section className="modules">
         {report.channels.map((channel) => (
           <article className="module" key={channel.channelId}>
+            <TrafficLight severity={channel.health} />
             <p className="eyebrow">{severityLabel[channel.health]}</p>
             <h3>{channel.channelName}</h3>
             <p><strong>{money(channel.currentRevenue)}</strong> current revenue<br />{pct(channel.revenueDeltaPct)} vs. prior 7 days</p>
