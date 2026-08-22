@@ -67,9 +67,10 @@ model Channel {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  commerceMetrics CommerceMetric[]
-  funnelMetrics   FunnelMetric[]
-  campaigns       Campaign[]
+  commerceMetrics       CommerceMetric[]
+  funnelMetrics         FunnelMetric[]
+  monthlyHistory        ChannelMonthlyMetric[]
+  campaigns             Campaign[]
 
   @@unique([type, name])
   @@unique([externalSource, externalId])
@@ -94,6 +95,24 @@ model CommerceMetric {
   @@index([date])
   @@index([productId, date])
   @@index([channelId, date])
+}
+
+model ChannelMonthlyMetric {
+  id        String   @id @default(cuid())
+  month     DateTime
+  channelId String
+  orders    Int      @default(0)
+  units     Int      @default(0)
+  revenue   Decimal  @default(0) @db.Decimal(12, 2)
+  source    String   @default("manual-history")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([month, channelId, source])
+  @@index([month])
+  @@index([channelId, month])
 }
 
 model FunnelMetric {
