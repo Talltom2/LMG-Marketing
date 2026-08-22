@@ -21,16 +21,16 @@ export default function WalmartProductHealthList(){
       <div style={{display:"flex",gap:22,flexWrap:"wrap",margin:"14px 0 8px",fontSize:"1.02rem"}}><strong>{counts.total} Active</strong><span style={{color:"#dc2626"}}><strong>{counts.red}</strong> Red</span><span style={{color:"#a16207"}}><strong>{counts.yellow}</strong> Yellow</span><span style={{color:"#15803d"}}><strong>{counts.green}</strong> Green</span></div>
       {summary&&<div style={{display:"flex",gap:18,flexWrap:"wrap",margin:"0 0 18px",color:"#687168",fontSize:".9rem"}}><span><strong>{summary.totalCatalog}</strong> total catalog</span><span><strong>{summary.publishedActive}</strong> published</span><span><strong>{summary.unpublished}</strong> unpublished</span><span><strong>{summary.otherStatus}</strong> other status</span><span><strong>{summary.inventoryRows}</strong> inventory rows received</span><span><strong>{summary.pricingOffers}</strong> pricing offers received</span></div>}
       {loading&&<p>Loading Walmart product health…</p>}{error&&<p>{error}</p>}
-      <div className="walmart-product-scroll" style={{width:"100%",maxHeight:"72vh",overflowY:"scroll",overflowX:"hidden",paddingRight:10}}>
+      <div className="walmart-product-scroll" style={{width:"100%",maxHeight:"72vh",overflowY:"scroll",overflowX:"hidden",paddingRight:8}}>
         <div style={{width:"100%",display:"grid",gap:8}}>
-          {!loading&&products.map(p=><article key={p.sku} style={{display:"grid",gridTemplateColumns:"18px minmax(300px,2.6fr) 88px 88px 94px minmax(150px,1fr) minmax(215px,1.25fr)",gap:12,alignItems:"center",padding:"12px 10px",border:"1px solid #ddd",borderRadius:8,width:"100%",boxSizing:"border-box"}}>
+          {!loading&&products.map(p=><article key={p.sku} style={{display:"grid",gridTemplateColumns:"18px minmax(250px,2.4fr) 76px 76px 82px minmax(130px,.95fr) minmax(220px,1.2fr)",gap:8,alignItems:"center",padding:"11px 8px",border:"1px solid #ddd",borderRadius:8,width:"100%",boxSizing:"border-box",fontSize:".96rem"}}>
             <span title={p.health} style={{width:15,height:15,borderRadius:"50%",background:color(p.health),display:"inline-block"}}/>
-            <div style={{minWidth:0}}><Link href={`/diagnostics/product?sku=${encodeURIComponent(p.sku)}`} style={{textDecoration:"none",color:"inherit"}}><strong style={{display:"block",lineHeight:1.25}}>{p.name}</strong><small style={{display:"block",marginTop:3,lineHeight:1.25}}>{p.sku}{p.productType?` · ${p.productType}`:""}</small></Link></div>
+            <div style={{minWidth:0}}><Link href={`/diagnostics/product?sku=${encodeURIComponent(p.sku)}`} style={{textDecoration:"none",color:"inherit"}}><strong style={{display:"block",lineHeight:1.22}}>{p.name}</strong><small style={{display:"block",marginTop:3,lineHeight:1.2}}>{p.sku}{p.productType?` · ${p.productType}`:""}</small></Link></div>
             <div>Inventory<br/><strong>{p.inventory==null?"N/A":p.inventory}</strong></div>
             <div>Traffic<br/><strong>{p.traffic??"—"}</strong></div>
             <div>Buy Box<br/><strong>{p.buyBoxWinRate==null?"—":`${p.buyBoxWinRate.toFixed(1)}%`}</strong></div>
-            <div><strong>{p.health}</strong><br/><small style={{lineHeight:1.2}}>{p.reasons.join(" · ")||"No live issue detected"}</small></div>
-            <div style={{minWidth:0}}><ZeroInventoryActions sku={p.sku} name={p.name}/>{p.inventory===0?<small style={{display:"block",marginTop:6}}>Out of stock</small>:p.inventory==null?<small style={{display:"block",marginTop:6}}>Inventory unavailable</small>:p.inventory<=3?<small style={{display:"block",marginTop:6}}>Low stock</small>:<small style={{display:"block",marginTop:6}}>Inventory healthy</small>}</div>
+            <div><strong>{p.health}</strong><br/><small style={{lineHeight:1.15}}>{p.reasons.join(" · ")||"No live issue detected"}</small></div>
+            <div style={{minWidth:0}}><ZeroInventoryActions sku={p.sku} name={p.name}/>{p.inventory===0?<small style={{display:"block",marginTop:5}}>Out of stock</small>:p.inventory==null?<small style={{display:"block",marginTop:5}}>Inventory unavailable</small>:p.inventory<=3?<small style={{display:"block",marginTop:5}}>Low stock</small>:<small style={{display:"block",marginTop:5}}>Inventory healthy</small>}</div>
           </article>)}
         </div>
       </div>
