@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {FormEvent,useEffect,useState} from "react";
-import {useSearchParams} from "next/navigation";
 import ProductFixButton from "./ProductFixButton";
 import WalmartProductHealthList from "../[channelId]/WalmartProductHealthList";
 
@@ -10,12 +9,11 @@ type Result={sku:string;requestedSku?:string;resolvedSku?:string|null;name:strin
 type Perf={status:string;summary?:{rows:number;gmv:number;units:number;authorizedOrders:number;visits:number;productPageviews:number;conversionRate:number|null;dailyAverageVisits:number|null;dailyAverageUnits:number|null};error?:string};
 
 export default function ProductDiagnostics(){
- const params=useSearchParams(); const initial=params.get("sku")??"";
- const[sku,setSku]=useState(initial);const[result,setResult]=useState<Result|null>(null);const[error,setError]=useState("");const[loading,setLoading]=useState(false);const[perf,setPerf]=useState<Perf>({status:"idle"});
+ const[sku,setSku]=useState("");const[result,setResult]=useState<Result|null>(null);const[error,setError]=useState("");const[loading,setLoading]=useState(false);const[perf,setPerf]=useState<Perf>({status:"idle"});
  async function loadPerformance(resolvedSku:string){setPerf({status:"requesting"});try{const r=await fetch("/api/integrations/walmart/reports",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:"ITEM_PERFORMANCE"})});const b=await r.json();if(!r.ok||!b.requestId)throw new Error(b.message??"Unable to request performance report.");setPerf({status:"processing"});for(let i=0;i<20;i++){await new Promise(x=>setTimeout(x,3000));const g=await fetch(`/api/integrations/walmart/reports?kind=ITEM_PERFORMANCE&requestId=${encodeURIComponent(b.requestId)}&sku=${encodeURIComponent(resolvedSku)}`,{cache:"no-store"});const body=await g.json();if(!g.ok)throw new Error(body.message??"Unable to retrieve performance report.");if(body.ready){setPerf({status:"ready",summary:body.summary});return;}}setPerf({status:"processing",error:"Walmart is still preparing the Item Performance report. Re-run the product diagnosis shortly."});}catch(e){setPerf({status:"error",error:e instanceof Error?e.message:"Unable to load actual conversion data."});}}
  async function run(value:string){setLoading(true);setError("");setResult(null);setPerf({status:"idle"});try{const r=await fetch(`/api/integrations/walmart/product-diagnostics?sku=${encodeURIComponent(value)}`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.message);setResult(b);void loadPerformance(b.sku);}catch(e){setError(e instanceof Error?e.message:"Unable to diagnose product.")}finally{setLoading(false)}}
  async function submit(e:FormEvent){e.preventDefault();await run(sku)}
- useEffect(()=>{if(initial)void run(initial)},[]);
+ useEffect(()=>{const initial=new URLSearchParams(window.location.search).get("sku")??"";if(initial){setSku(initial);void run(initial);}},[]);
  const s=result?.summary;const actual=perf.summary?.conversionRate??null;const targetMin=actual&&actual>0?Math.ceil(4/actual):null;const targetMax=actual&&actual>0?Math.ceil(6/actual):null;
  return <main><header><p className="eyebrow">Walmart Intelligence</p><h1>Product Diagnostic Workbench</h1><p className="subtitle">SKU → catalog → inventory → offer → Buy Box → visibility → conversion → diagnosis → corrective action</p><p><Link href="/diagnostics">← Diagnostic Center</Link></p></header>
  <section className="panel"><div><h2>Diagnose a Walmart SKU</h2><p>Enter the Sellerchamp/LMG or Walmart seller SKU.</p></div><form onSubmit={submit} style={{display:"flex",gap:10,flexWrap:"wrap"}}><input value={sku} onChange={e=>setSku(e.target.value)} placeholder="Enter SKU" required style={{padding:12,minWidth:280,border:"1px solid #aaa",borderRadius:8}}/><button disabled={loading} style={{padding:"12px 16px",borderRadius:8,fontWeight:700}}>{loading?"Diagnosing…":"Diagnose Product"}</button></form>{error&&<p>{error}</p>}</section>
