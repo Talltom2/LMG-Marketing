@@ -42,8 +42,13 @@ export async function POST(request: NextRequest) {
       let saved = 0;
       for (const item of metrics) {
         const date = utcDay(item.date);
-        const product = item.sku
-          ? await db.product.findUnique({ where: { sku: item.sku } })
+        const cleanSku = String(item.sku ?? "").trim();
+        const product = cleanSku
+          ? await db.product.upsert({
+              where: { sku: cleanSku },
+              create: { sku: cleanSku, name: cleanSku, active: true },
+              update: { active: true },
+            })
           : null;
 
         await db.funnelMetric.deleteMany({
