@@ -3,21 +3,335 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type ProductRow = { sku: string; name: string; units: number; commerceRevenue: number; productViews: number; purchaseConversionRate: number; signal: "PROMOTE" | "FIX_CONVERSION" | "WATCH" | "INSUFFICIENT_DATA"; };
-type SavedCampaign = { id: string; name: string; objective?: string | null; startDate: string; endDate: string; status: string; products: { product: { sku: string; name: string } }[]; recommendations: { id: string; title: string; recommendation: string; actions: { actionType: string; description: string; executionTarget?: string | null; completed: boolean }[] }[]; };
-type ProductCollection = { id: string; name: string; skus: string[]; };
+type ProductRow = {
+  sku: string;
+  name: string;
+  units: number;
+  commerceRevenue: number;
+  productViews: number;
+  purchaseConversionRate: number;
+  signal: "PROMOTE" | "FIX_CONVERSION" | "WATCH" | "INSUFFICIENT_DATA";
+};
+
+type SavedCampaign = {
+  id: string;
+  name: string;
+  objective?: string | null;
+  startDate: string;
+  endDate: string;
+  status: string;
+  products: { product: { sku: string; name: string } }[];
+  recommendations: {
+    id: string;
+    title: string;
+    recommendation: string;
+    actions: { actionType: string; description: string; executionTarget?: string | null; completed: boolean }[];
+  }[];
+};
+
+type ProductCollection = { id: string; name: string; skus: string[] };
+
 const COLLECTION_STORAGE_KEY = "lmg-marketing-product-collections-v1";
-const channelOptions = [["WOOCOMMERCE","WooCommerce","Primary store landing pages, offers and onsite merchandising"],["PINTEREST","Pinterest","Pins, boards and discovery traffic"],["TIKTOK","TikTok","Short-form creative, catalog and Shop"],["META","Facebook / Instagram","Organic, catalog and paid social"],["BING","Bing / Microsoft","Search, Shopping and ads"],["WALMART","Walmart","Marketplace promotions and listing support"],["AMAZON_US","Amazon US","Marketplace promotion"],["AMAZON_CA","Amazon Canada","Marketplace promotion"],["EMAIL","Email","Customer-list campaign"]] as const;
-const today=new Date(); const isoDate=(d:Date)=>d.toISOString().slice(0,10); const addDays=(d:Date,n:number)=>new Date(d.getTime()+n*86400000);
-export default function CampaignBuilderPage(){
-const [products,setProducts]=useState<ProductRow[]>([]),[campaigns,setCampaigns]=useState<SavedCampaign[]>([]),[selectedProducts,setSelectedProducts]=useState<string[]>([]),[channels,setChannels]=useState<string[]>(["WOOCOMMERCE","PINTEREST"]),[name,setName]=useState("September Country Home Campaign"),[objective,setObjective]=useState("Increase qualified traffic and profitable sales for selected hero products."),[startDate,setStartDate]=useState(isoDate(addDays(today,8))),[endDate,setEndDate]=useState(isoDate(addDays(today,22))),[saving,setSaving]=useState(false),[message,setMessage]=useState(""),[searchQuery,setSearchQuery]=useState(""),[collections,setCollections]=useState<ProductCollection[]>([]),[newCollectionName,setNewCollectionName]=useState(""),[collectionMessage,setCollectionMessage]=useState("");
-async function refresh(){const [pr,cr]=await Promise.all([fetch("/api/intelligence/products?days=30",{cache:"no-store"}),fetch("/api/campaigns",{cache:"no-store"})]);if(pr.ok){const d=await pr.json();setProducts(d.products??[]);if(!selectedProducts.length)setSelectedProducts((d.products??[]).filter((r:ProductRow)=>r.signal==="PROMOTE").slice(0,4).map((r:ProductRow)=>r.sku));}if(cr.ok){const d=await cr.json();setCampaigns(d.campaigns??[]);}}
-useEffect(()=>{void refresh();try{const s=window.localStorage.getItem(COLLECTION_STORAGE_KEY);if(s)setCollections(JSON.parse(s));}catch{setCollections([]);}},[]);
-const selectedRows=useMemo(()=>products.filter(p=>selectedProducts.includes(p.sku)),[products,selectedProducts]);const recommendedProducts=products.filter(p=>p.signal==="PROMOTE");const normalizedSearch=searchQuery.trim().toLowerCase();const visibleProducts=useMemo(()=>!normalizedSearch?products:products.filter(p=>p.sku.toLowerCase().includes(normalizedSearch)||p.name.toLowerCase().includes(normalizedSearch)),[products,normalizedSearch]);const start=new Date(`${startDate}T12:00:00`);const calendar=channels.map(type=>{const offset=type==="PINTEREST"?-7:type==="EMAIL"||type==="WOOCOMMERCE"?0:type==="BING"?-5:-3;const label=channelOptions.find(([v])=>v===type)?.[1]??type;return{type,label,date:isoDate(addDays(start,offset))};}).sort((a,b)=>a.date.localeCompare(b.date));const heroNames=selectedRows.slice(0,3).map(r=>r.name).join(", ")||"selected products";
-function persistCollections(n:ProductCollection[]){setCollections(n);window.localStorage.setItem(COLLECTION_STORAGE_KEY,JSON.stringify(n));}function toggleProduct(s:string){setSelectedProducts(c=>c.includes(s)?c.filter(i=>i!==s):[...c,s]);}function toggleChannel(t:string){setChannels(c=>c.includes(t)?c.filter(i=>i!==t):[...c,t]);}function createCollection(){const n=newCollectionName.trim();if(!n){setCollectionMessage("Enter a collection name first.");return;}if(!selectedProducts.length){setCollectionMessage("Select at least one product before saving a collection.");return;}persistCollections([...collections,{id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,name:n,skus:[...selectedProducts]}]);setNewCollectionName("");setCollectionMessage(`${n} saved with ${selectedProducts.length} product${selectedProducts.length===1?"":"s"}.`);}function addCollectionToCampaign(c:ProductCollection){setSelectedProducts(x=>Array.from(new Set([...x,...c.skus])));setCollectionMessage(`${c.name} added to this campaign.`);}function replaceWithCollection(c:ProductCollection){setSelectedProducts(c.skus);setCollectionMessage(`${c.name} is now the campaign product set.`);}function deleteCollection(id:string){const c=collections.find(i=>i.id===id);persistCollections(collections.filter(i=>i.id!==id));setCollectionMessage(c?`${c.name} deleted.`:"Collection deleted.");}
-async function createCampaign(){setSaving(true);setMessage("");try{const r=await fetch("/api/campaigns",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,objective,productSkus:selectedProducts,channels,startDate,endDate})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Unable to create campaign");setMessage("Campaign plan saved. Calendar, creative drafts, execution checkpoints and metrics review actions are now persisted.");await refresh();}catch(e){setMessage(e instanceof Error?e.message:"Unable to create campaign");}finally{setSaving(false);}}
-return <main><header><p className="eyebrow">LMG Marketing</p><h1>Campaign Builder</h1><p className="subtitle">Campaign → Products / Collections → Channels → Calendar → Creative → Approval / Execution → Metrics → Diagnostics → Learning</p><p><Link href="/">← Marketing Intelligence</Link> · <Link href="/diagnostics">Diagnostic Center →</Link></p></header><section className="scorecards"><article className="card"><span>Recommended products</span><strong>{recommendedProducts.length}</strong><small>30-day intelligence signal</small></article><article className="card"><span>Selected products</span><strong>{selectedProducts.length}</strong><small>Hero + support products</small></article><article className="card"><span>Saved collections</span><strong>{collections.length}</strong><small>Reusable product groups</small></article><article className="card"><span>Promotion tools</span><strong>{channels.length}</strong><small>Selected channels</small></article><article className="card"><span>Saved campaigns</span><strong>{campaigns.length}</strong><small>Reusable campaign history</small></article></section>
-<section className="panel"><p className="eyebrow">1 · Campaign</p><h2>Define the promotion</h2><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16}}><label>Name<br/><input value={name} onChange={e=>setName(e.target.value)} style={{width:"100%"}}/></label><label>Start<br/><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} style={{width:"100%"}}/></label><label>End<br/><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{width:"100%"}}/></label></div><label>Objective<br/><textarea value={objective} onChange={e=>setObjective(e.target.value)} rows={3} style={{width:"100%"}}/></label></section>
-<section className="panel campaign-products-panel"><p className="eyebrow">2 · What to promote</p><h2>Find products or use a collection</h2><p>Search by SKU, full product name, or any part of the product name. Products marked <strong>PROMOTE</strong> already convert comparatively well but need more traffic.</p><hr style={{width:"100%",border:0,borderTop:"1px solid #dde1d8",margin:"4px 0 22px"}}/><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:28,alignItems:"start"}}><div><h3>Find individual products</h3><label><strong>Search products</strong><br/><input type="search" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="SKU or product name — e.g. Rustic Rooster" style={{width:"100%"}}/></label><p><strong>{visibleProducts.length}</strong> matching product{visibleProducts.length===1?"":"s"}</p><div style={{maxHeight:430,overflowY:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th align="left">Use</th><th align="left">Product</th><th align="left">Signal</th><th align="right">Views</th><th align="right">Conversion</th><th align="right">30d Revenue</th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.sku}><td><input type="checkbox" checked={selectedProducts.includes(p.sku)} onChange={()=>toggleProduct(p.sku)}/></td><td><strong>{p.name}</strong><br/><small>{p.sku}</small></td><td>{p.signal}</td><td align="right">{p.productViews}</td><td align="right">{(p.purchaseConversionRate*100).toFixed(1)}%</td><td align="right">${p.commerceRevenue.toFixed(2)}</td></tr>)}</tbody></table></div></div><div><h3>Collections / related product groups</h3><p>Build and reuse families such as Rustic Rooster, Autumn Checkerboard, candles, potholders, or any hand-picked merchandising group.</p><div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:18}}><input value={newCollectionName} onChange={e=>setNewCollectionName(e.target.value)} placeholder="Collection name — e.g. Rustic Rooster" style={{flex:"1 1 240px",minWidth:0}}/><button type="button" onClick={createCollection}>Save selected as collection</button><button type="button" onClick={()=>setSelectedProducts([])}>Clear selection</button></div>{collectionMessage&&<p><strong>{collectionMessage}</strong></p>}{collections.length===0?<p><small>No saved collections yet. Select products in the left column, name the group here, and save it.</small></p>:<div style={{display:"grid",gap:12}}>{collections.map(c=><article className="module" key={c.id}><h3>{c.name}</h3><p>{c.skus.length} product{c.skus.length===1?"":"s"}</p><p><small>{c.skus.slice(0,5).join(", ")}{c.skus.length>5?"…":""}</small></p><p><button type="button" onClick={()=>replaceWithCollection(c)}>Promote collection</button>{" "}<button type="button" onClick={()=>addCollectionToCampaign(c)}>Add to selection</button>{" "}<button type="button" onClick={()=>deleteCollection(c.id)}>Delete</button></p></article>)}</div>}</div></div></section>
-<section className="panel"><p className="eyebrow">3 · Promotional tools</p><h2>Select the channels</h2><div className="modules">{channelOptions.map(([type,label,detail])=><article className="module" key={type} style={{outline:channels.includes(type)?"2px solid currentColor":undefined}}><label style={{cursor:"pointer"}}><input type="checkbox" checked={channels.includes(type)} onChange={()=>toggleChannel(type)}/> <strong>{label}</strong></label><p>{detail}</p></article>)}</div></section><section className="panel"><p className="eyebrow">4 · Recommended calendar</p><h2>Stagger discovery before the selling window</h2>{calendar.map(i=><p key={i.type}><strong>{i.date}</strong> · {i.label}</p>)}{!calendar.length&&<p>Select at least one promotional tool.</p>}</section><section className="panel"><p className="eyebrow">5 · Creative</p><h2>Generated creative brief</h2><p><strong>Hero products:</strong> {heroNames}</p><p><strong>Core message:</strong> Warm, useful country-home inspiration with a clear reason to shop now. Adapt the hook, body copy, image/video treatment and CTA to each selected channel while keeping the campaign message consistent.</p><p><strong>Objective:</strong> {objective}</p><p><small>V1 persists channel-specific creative drafts and execution instructions. External publishing/ad-spend actions remain approval-gated.</small></p></section><section className="panel"><p className="eyebrow">6 · Schedule / Execute / Measure</p><h2>Create the reusable campaign workflow</h2><p>Saving creates an approved campaign plan with four actions per channel: calendar timing, creative draft, approval-gated scheduling/execution, and post-campaign metrics review. The metrics review explicitly feeds Expected vs Actual results back into the Diagnostic/Intelligence Engine.</p><button onClick={createCampaign} disabled={saving||!selectedProducts.length||!channels.length}>{saving?"Creating…":"Create Campaign Plan"}</button>{message&&<p><strong>{message}</strong></p>}</section><section className="panel"><p className="eyebrow">Campaign history</p><h2>Saved workflows</h2>{!campaigns.length&&<p>No saved campaigns yet.</p>}{campaigns.map(c=><article className="module" key={c.id} style={{marginBottom:16}}><h3>{c.name}</h3><p><strong>{c.status}</strong> · {c.startDate.slice(0,10)} → {c.endDate.slice(0,10)} · {c.products.length} products · {c.recommendations.length} channel plans</p><p>{c.objective}</p>{c.recommendations.map(r=><details key={r.id}><summary>{r.title}</summary><p>{r.recommendation}</p>{r.actions.map((a,i)=><p key={i}><strong>{a.actionType}</strong> · {a.description}</p>)}</details>)}</article>)}</section></main>;
+const channelOptions = [
+  ["WOOCOMMERCE", "WooCommerce", "Primary store landing pages, offers and onsite merchandising"],
+  ["PINTEREST", "Pinterest", "Pins, boards and discovery traffic"],
+  ["TIKTOK", "TikTok", "Short-form creative, catalog and Shop"],
+  ["META", "Facebook / Instagram", "Organic, catalog and paid social"],
+  ["BING", "Bing / Microsoft", "Search, Shopping and ads"],
+  ["WALMART", "Walmart", "Marketplace promotions and listing support"],
+  ["AMAZON_US", "Amazon US", "Marketplace promotion"],
+  ["AMAZON_CA", "Amazon Canada", "Marketplace promotion"],
+  ["EMAIL", "Email", "Customer-list campaign"],
+] as const;
+
+const today = new Date();
+const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86400000);
+
+export default function CampaignBuilderPage() {
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [campaigns, setCampaigns] = useState<SavedCampaign[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [channels, setChannels] = useState<string[]>(["WOOCOMMERCE", "PINTEREST"]);
+  const [name, setName] = useState("September Country Home Campaign");
+  const [objective, setObjective] = useState("Increase qualified traffic and profitable sales for selected hero products.");
+  const [startDate, setStartDate] = useState(isoDate(addDays(today, 8)));
+  const [endDate, setEndDate] = useState(isoDate(addDays(today, 22)));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collections, setCollections] = useState<ProductCollection[]>([]);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [collectionMessage, setCollectionMessage] = useState("");
+
+  async function refresh() {
+    const [productResponse, campaignResponse] = await Promise.all([
+      fetch("/api/intelligence/products?days=30", { cache: "no-store" }),
+      fetch("/api/campaigns", { cache: "no-store" }),
+    ]);
+
+    if (productResponse.ok) {
+      const data = await productResponse.json();
+      setProducts(data.products ?? []);
+      if (!selectedProducts.length) {
+        setSelectedProducts(
+          (data.products ?? [])
+            .filter((row: ProductRow) => row.signal === "PROMOTE")
+            .slice(0, 4)
+            .map((row: ProductRow) => row.sku),
+        );
+      }
+    }
+
+    if (campaignResponse.ok) {
+      const data = await campaignResponse.json();
+      setCampaigns(data.campaigns ?? []);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+    try {
+      const saved = window.localStorage.getItem(COLLECTION_STORAGE_KEY);
+      if (saved) setCollections(JSON.parse(saved));
+    } catch {
+      setCollections([]);
+    }
+  }, []);
+
+  const selectedRows = useMemo(
+    () => products.filter((product) => selectedProducts.includes(product.sku)),
+    [products, selectedProducts],
+  );
+  const recommendedProducts = products.filter((product) => product.signal === "PROMOTE");
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleProducts = useMemo(() => {
+    if (!normalizedSearch) return products;
+    return products.filter(
+      (product) =>
+        product.sku.toLowerCase().includes(normalizedSearch) ||
+        product.name.toLowerCase().includes(normalizedSearch),
+    );
+  }, [products, normalizedSearch]);
+
+  const start = new Date(`${startDate}T12:00:00`);
+  const calendar = channels
+    .map((type) => {
+      const offset = type === "PINTEREST" ? -7 : type === "EMAIL" || type === "WOOCOMMERCE" ? 0 : type === "BING" ? -5 : -3;
+      const label = channelOptions.find(([value]) => value === type)?.[1] ?? type;
+      return { type, label, date: isoDate(addDays(start, offset)) };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const heroNames = selectedRows.slice(0, 3).map((row) => row.name).join(", ") || "selected products";
+
+  function persistCollections(next: ProductCollection[]) {
+    setCollections(next);
+    window.localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(next));
+  }
+
+  function toggleProduct(sku: string) {
+    setSelectedProducts((current) =>
+      current.includes(sku) ? current.filter((item) => item !== sku) : [...current, sku],
+    );
+  }
+
+  function toggleChannel(type: string) {
+    setChannels((current) =>
+      current.includes(type) ? current.filter((item) => item !== type) : [...current, type],
+    );
+  }
+
+  function createCollection() {
+    const collectionName = newCollectionName.trim();
+    if (!collectionName) {
+      setCollectionMessage("Enter a collection name first.");
+      return;
+    }
+    if (!selectedProducts.length) {
+      setCollectionMessage("Select at least one product before saving a collection.");
+      return;
+    }
+    persistCollections([
+      ...collections,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: collectionName, skus: [...selectedProducts] },
+    ]);
+    setNewCollectionName("");
+    setCollectionMessage(`${collectionName} saved with ${selectedProducts.length} product${selectedProducts.length === 1 ? "" : "s"}.`);
+  }
+
+  function addCollectionToCampaign(collection: ProductCollection) {
+    setSelectedProducts((current) => Array.from(new Set([...current, ...collection.skus])));
+    setCollectionMessage(`${collection.name} added to this campaign.`);
+  }
+
+  function replaceWithCollection(collection: ProductCollection) {
+    setSelectedProducts(collection.skus);
+    setCollectionMessage(`${collection.name} is now the campaign product set.`);
+  }
+
+  function deleteCollection(id: string) {
+    const collection = collections.find((item) => item.id === id);
+    persistCollections(collections.filter((item) => item.id !== id));
+    setCollectionMessage(collection ? `${collection.name} deleted.` : "Collection deleted.");
+  }
+
+  async function createCampaign() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, objective, productSkus: selectedProducts, channels, startDate, endDate }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to create campaign");
+      setMessage("Campaign plan saved. Calendar, creative drafts, execution checkpoints and metrics review actions are now persisted.");
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create campaign");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <main className="campaign-shell">
+      <header className="campaign-topbar">
+        <div>
+          <p className="eyebrow">Laughing Moose Gifts · LMG Marketing</p>
+          <p className="campaign-links"><Link href="/">Marketing Intelligence</Link> · <Link href="/diagnostics">Diagnostic Center</Link></p>
+        </div>
+      </header>
+
+      <section className="campaign-details-card">
+        <div className="campaign-details-grid">
+          <label>Campaign name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label>Start<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+          <label>End<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+        </div>
+        <label>Objective<textarea value={objective} onChange={(e) => setObjective(e.target.value)} rows={2} /></label>
+      </section>
+
+      <section className="campaign-workspace">
+        <h1 className="campaign-name-title">{name || "Untitled Campaign"}</h1>
+        <h2 className="campaign-step-title">2 · What to promote</h2>
+        <h3 className="campaign-section-title">Find products or use a collection</h3>
+        <p className="campaign-intro">Search by SKU, full product name, or any part of the product name. Products marked <strong>PROMOTE</strong> already convert comparatively well but need more traffic.</p>
+        <div className="campaign-divider" />
+
+        <div className="promotion-columns">
+          <section className="promotion-pane">
+            <h3>Find individual products</h3>
+            <p className="pane-subtitle">Search and select specific products to promote.</p>
+            <label className="field-label">Search products
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="SKU or product name — e.g. Rustic Rooster"
+              />
+            </label>
+            <p className="match-count"><strong>{visibleProducts.length}</strong> matching product{visibleProducts.length === 1 ? "" : "s"}</p>
+            <div className="product-table-wrap">
+              <table className="campaign-table">
+                <thead><tr><th>Use</th><th>Product</th><th>Signal</th><th>Views</th><th>Conversion</th><th>30d Revenue</th></tr></thead>
+                <tbody>
+                  {visibleProducts.map((product) => (
+                    <tr key={product.sku}>
+                      <td><input type="checkbox" checked={selectedProducts.includes(product.sku)} onChange={() => toggleProduct(product.sku)} /></td>
+                      <td><strong>{product.name}</strong><br /><small>{product.sku}</small></td>
+                      <td><span className={`signal signal-${product.signal.toLowerCase()}`}>{product.signal}</span></td>
+                      <td>{product.productViews}</td>
+                      <td>{(product.purchaseConversionRate * 100).toFixed(1)}%</td>
+                      <td>${product.commerceRevenue.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="promotion-pane">
+            <h3>Collections / related product groups</h3>
+            <p className="pane-subtitle">Build and reuse product families and merchandising groups.</p>
+            <p>Create collections such as Rustic Rooster, Autumn Checkerboard, candles, potholders, or any hand-picked merchandising group.</p>
+            <div className="collection-create-row">
+              <input value={newCollectionName} onChange={(e) => setNewCollectionName(e.target.value)} placeholder="Collection name — e.g. Rustic Rooster" />
+              <button type="button" className="button-outline" onClick={createCollection}>Save selected as collection</button>
+            </div>
+            <button type="button" className="button-muted" onClick={() => setSelectedProducts([])}>Clear selection</button>
+            {collectionMessage && <p className="status-message"><strong>{collectionMessage}</strong></p>}
+            <h4 className="saved-heading">Saved collections</h4>
+            {collections.length === 0 ? (
+              <div className="collection-empty">No saved collections yet. Select products on the left, name the group above, and save it.</div>
+            ) : (
+              <div className="collection-list">
+                {collections.map((collection) => (
+                  <article className="collection-row" key={collection.id}>
+                    <div><strong>{collection.name}</strong><small>{collection.skus.length} product{collection.skus.length === 1 ? "" : "s"}</small></div>
+                    <div className="collection-actions">
+                      <button type="button" onClick={() => replaceWithCollection(collection)}>Promote collection</button>
+                      <button type="button" onClick={() => addCollectionToCampaign(collection)}>Add to selection</button>
+                      <button type="button" className="text-button" onClick={() => deleteCollection(collection.id)}>Delete</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            <div className="campaign-tip">After selecting products or a collection, review the promotional channels below.</div>
+          </section>
+        </div>
+      </section>
+
+      <section id="channels" className="campaign-stage-panel">
+        <div className="stage-heading"><span>3</span><div><p className="eyebrow">Channels & schedule</p><h2>Select the promotional channels</h2></div></div>
+        <div className="channel-grid">
+          {channelOptions.map(([type, label, detail]) => (
+            <article className={`channel-card ${channels.includes(type) ? "selected" : ""}`} key={type}>
+              <label><input type="checkbox" checked={channels.includes(type)} onChange={() => toggleChannel(type)} /> <strong>{label}</strong></label>
+              <p>{detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="campaign-stage-panel">
+        <div className="stage-heading"><span>4</span><div><p className="eyebrow">Recommended calendar</p><h2>Stagger discovery before the selling window</h2></div></div>
+        <div className="calendar-list">{calendar.map((item) => <p key={item.type}><strong>{item.date}</strong><span>{item.label}</span></p>)}</div>
+      </section>
+
+      <section className="campaign-stage-panel">
+        <div className="stage-heading"><span>5</span><div><p className="eyebrow">Creative</p><h2>Generated creative brief</h2></div></div>
+        <p><strong>Hero products:</strong> {heroNames}</p>
+        <p><strong>Core message:</strong> Warm, useful country-home inspiration with a clear reason to shop now. Adapt the hook, body copy, image/video treatment and CTA to each selected channel while keeping the campaign message consistent.</p>
+        <p><strong>Objective:</strong> {objective}</p>
+      </section>
+
+      <section className="campaign-stage-panel">
+        <div className="stage-heading"><span>6</span><div><p className="eyebrow">Schedule / execute / measure</p><h2>Create the reusable campaign workflow</h2></div></div>
+        <p>Saving creates calendar timing, creative drafts, approval-gated scheduling/execution, and post-campaign metrics review for each selected channel.</p>
+        <button className="primary-button" onClick={createCampaign} disabled={saving || !selectedProducts.length || !channels.length}>{saving ? "Creating…" : "Create Campaign Plan"}</button>
+        {message && <p className="status-message"><strong>{message}</strong></p>}
+      </section>
+
+      <nav className="campaign-stepper" aria-label="Campaign progress">
+        <span className="done">✓ Campaign Details</span>
+        <span className="active">2 What to Promote</span>
+        <a href="#channels">3 Channels & Schedule</a>
+        <span>4 Review & Launch</span>
+        <a className="next-button" href="#channels">Next: Channels & Schedule →</a>
+      </nav>
+
+      {campaigns.length > 0 && (
+        <section className="campaign-history">
+          <h2>Saved campaign workflows</h2>
+          {campaigns.map((campaign) => (
+            <details key={campaign.id}><summary>{campaign.name} · {campaign.status}</summary><p>{campaign.startDate.slice(0, 10)} → {campaign.endDate.slice(0, 10)} · {campaign.products.length} products · {campaign.recommendations.length} channel plans</p></details>
+          ))}
+        </section>
+      )}
+    </main>
+  );
 }
