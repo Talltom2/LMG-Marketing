@@ -13,6 +13,7 @@ h2, h3, p { margin-top: 0; }
 .card span, .card small { display: block; color: #687168; }
 .card strong { display: block; font-size: 2rem; margin: 12px 0; }
 .panel { padding: 28px; margin: 18px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 28px; }
+.campaign-products-panel { display: block; }
 .empty-state { padding: 24px; background: #f7f8f5; border-radius: 12px; }
 .empty-state p { margin: 8px 0 0; color: #687168; }
 .modules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 18px; }
