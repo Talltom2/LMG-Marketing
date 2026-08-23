@@ -47,6 +47,8 @@ const channelOptions = [
 const today = new Date();
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86400000);
+const recommendedStartDate = isoDate(addDays(today, 8));
+const recommendedEndDate = isoDate(addDays(today, 22));
 
 export default function CampaignBuilderPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -55,8 +57,8 @@ export default function CampaignBuilderPage() {
   const [channels, setChannels] = useState<string[]>(["WOOCOMMERCE", "PINTEREST"]);
   const [name, setName] = useState("September Country Home Campaign");
   const [objective, setObjective] = useState("Increase qualified traffic and profitable sales for selected hero products.");
-  const [startDate, setStartDate] = useState(isoDate(addDays(today, 8)));
-  const [endDate, setEndDate] = useState(isoDate(addDays(today, 22)));
+  const [startDate, setStartDate] = useState(recommendedStartDate);
+  const [endDate, setEndDate] = useState(recommendedEndDate);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -114,6 +116,7 @@ export default function CampaignBuilderPage() {
     );
   }, [products, normalizedSearch]);
 
+  const datesOverridden = startDate !== recommendedStartDate || endDate !== recommendedEndDate;
   const start = new Date(`${startDate}T12:00:00`);
   const calendar = channels
     .map((type) => {
@@ -206,17 +209,23 @@ export default function CampaignBuilderPage() {
       </header>
 
       <section className="campaign-details-card">
+        <h2 className="campaign-card-step-title">1 · Build New Marketing Campaign</h2>
+        <p className="date-recommendation-copy"><strong>Intelligence recommendation:</strong> begin {recommendedStartDate} and end {recommendedEndDate}. These dates are recommendations only and remain subject to your approval or override.</p>
         <div className="campaign-details-grid">
           <label>Campaign name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label>Start<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-          <label>End<input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+          <label>Start <span className="recommendation-tag">Recommended</span><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+          <label>End <span className="recommendation-tag">Recommended</span><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
         </div>
         <label>Objective<textarea value={objective} onChange={(e) => setObjective(e.target.value)} rows={2} /></label>
+        <div className="date-approval-row">
+          <span className={datesOverridden ? "date-status overridden" : "date-status recommended"}>{datesOverridden ? "Dates overridden by you" : "Using Intelligence-recommended dates"}</span>
+          {datesOverridden && <button type="button" className="button-muted" onClick={() => { setStartDate(recommendedStartDate); setEndDate(recommendedEndDate); }}>Restore recommended dates</button>}
+        </div>
       </section>
 
       <section className="campaign-workspace">
         <h1 className="campaign-name-title">{name || "Untitled Campaign"}</h1>
-        <h2 className="campaign-step-title">2 · What to promote</h2>
+        <h2 className="campaign-step-title">2 · Products to Promote</h2>
         <h3 className="campaign-section-title">Find products or use a collection</h3>
         <p className="campaign-intro">Search by SKU, full product name, or any part of the product name. Products marked <strong>PROMOTE</strong> already convert comparatively well but need more traffic.</p>
         <div className="campaign-divider" />
@@ -226,29 +235,20 @@ export default function CampaignBuilderPage() {
             <h3>Find individual products</h3>
             <p className="pane-subtitle">Search and select specific products to promote.</p>
             <label className="field-label">Search products
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="SKU or product name — e.g. Rustic Rooster"
-              />
+              <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="SKU or product name — e.g. Rustic Rooster" />
             </label>
             <p className="match-count"><strong>{visibleProducts.length}</strong> matching product{visibleProducts.length === 1 ? "" : "s"}</p>
             <div className="product-table-wrap">
               <table className="campaign-table">
                 <thead><tr><th>Use</th><th>Product</th><th>Signal</th><th>Views</th><th>Conversion</th><th>30d Revenue</th></tr></thead>
-                <tbody>
-                  {visibleProducts.map((product) => (
-                    <tr key={product.sku}>
-                      <td><input type="checkbox" checked={selectedProducts.includes(product.sku)} onChange={() => toggleProduct(product.sku)} /></td>
-                      <td><strong>{product.name}</strong><br /><small>{product.sku}</small></td>
-                      <td><span className={`signal signal-${product.signal.toLowerCase()}`}>{product.signal}</span></td>
-                      <td>{product.productViews}</td>
-                      <td>{(product.purchaseConversionRate * 100).toFixed(1)}%</td>
-                      <td>${product.commerceRevenue.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                <tbody>{visibleProducts.map((product) => (
+                  <tr key={product.sku}>
+                    <td><input type="checkbox" checked={selectedProducts.includes(product.sku)} onChange={() => toggleProduct(product.sku)} /></td>
+                    <td><strong>{product.name}</strong><br /><small>{product.sku}</small></td>
+                    <td><span className={`signal signal-${product.signal.toLowerCase()}`}>{product.signal}</span></td>
+                    <td>{product.productViews}</td><td>{(product.purchaseConversionRate * 100).toFixed(1)}%</td><td>${product.commerceRevenue.toFixed(2)}</td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
           </section>
@@ -257,29 +257,13 @@ export default function CampaignBuilderPage() {
             <h3>Collections / related product groups</h3>
             <p className="pane-subtitle">Build and reuse product families and merchandising groups.</p>
             <p>Create collections such as Rustic Rooster, Autumn Checkerboard, candles, potholders, or any hand-picked merchandising group.</p>
-            <div className="collection-create-row">
-              <input value={newCollectionName} onChange={(e) => setNewCollectionName(e.target.value)} placeholder="Collection name — e.g. Rustic Rooster" />
-              <button type="button" className="button-outline" onClick={createCollection}>Save selected as collection</button>
-            </div>
+            <div className="collection-create-row"><input value={newCollectionName} onChange={(e) => setNewCollectionName(e.target.value)} placeholder="Collection name — e.g. Rustic Rooster" /><button type="button" className="button-outline" onClick={createCollection}>Save selected as collection</button></div>
             <button type="button" className="button-muted" onClick={() => setSelectedProducts([])}>Clear selection</button>
             {collectionMessage && <p className="status-message"><strong>{collectionMessage}</strong></p>}
             <h4 className="saved-heading">Saved collections</h4>
-            {collections.length === 0 ? (
-              <div className="collection-empty">No saved collections yet. Select products on the left, name the group above, and save it.</div>
-            ) : (
-              <div className="collection-list">
-                {collections.map((collection) => (
-                  <article className="collection-row" key={collection.id}>
-                    <div><strong>{collection.name}</strong><small>{collection.skus.length} product{collection.skus.length === 1 ? "" : "s"}</small></div>
-                    <div className="collection-actions">
-                      <button type="button" onClick={() => replaceWithCollection(collection)}>Promote collection</button>
-                      <button type="button" onClick={() => addCollectionToCampaign(collection)}>Add to selection</button>
-                      <button type="button" className="text-button" onClick={() => deleteCollection(collection.id)}>Delete</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+            {collections.length === 0 ? <div className="collection-empty">No saved collections yet. Select products on the left, name the group above, and save it.</div> : <div className="collection-list">{collections.map((collection) => (
+              <article className="collection-row" key={collection.id}><div><strong>{collection.name}</strong><small>{collection.skus.length} product{collection.skus.length === 1 ? "" : "s"}</small></div><div className="collection-actions"><button type="button" onClick={() => replaceWithCollection(collection)}>Promote collection</button><button type="button" onClick={() => addCollectionToCampaign(collection)}>Add to selection</button><button type="button" className="text-button" onClick={() => deleteCollection(collection.id)}>Delete</button></div></article>
+            ))}</div>}
             <div className="campaign-tip">After selecting products or a collection, review the promotional channels below.</div>
           </section>
         </div>
@@ -287,51 +271,18 @@ export default function CampaignBuilderPage() {
 
       <section id="channels" className="campaign-stage-panel">
         <div className="stage-heading"><span>3</span><div><p className="eyebrow">Channels & schedule</p><h2>Select the promotional channels</h2></div></div>
-        <div className="channel-grid">
-          {channelOptions.map(([type, label, detail]) => (
-            <article className={`channel-card ${channels.includes(type) ? "selected" : ""}`} key={type}>
-              <label><input type="checkbox" checked={channels.includes(type)} onChange={() => toggleChannel(type)} /> <strong>{label}</strong></label>
-              <p>{detail}</p>
-            </article>
-          ))}
-        </div>
+        <div className="channel-grid">{channelOptions.map(([type, label, detail]) => (
+          <article className={`channel-card ${channels.includes(type) ? "selected" : ""}`} key={type}><label><input type="checkbox" checked={channels.includes(type)} onChange={() => toggleChannel(type)} /> <strong>{label}</strong></label><p>{detail}</p></article>
+        ))}</div>
       </section>
 
-      <section className="campaign-stage-panel">
-        <div className="stage-heading"><span>4</span><div><p className="eyebrow">Recommended calendar</p><h2>Stagger discovery before the selling window</h2></div></div>
-        <div className="calendar-list">{calendar.map((item) => <p key={item.type}><strong>{item.date}</strong><span>{item.label}</span></p>)}</div>
-      </section>
+      <section className="campaign-stage-panel"><div className="stage-heading"><span>4</span><div><p className="eyebrow">Recommended calendar</p><h2>Stagger discovery before the selling window</h2></div></div><div className="calendar-list">{calendar.map((item) => <p key={item.type}><strong>{item.date}</strong><span>{item.label}</span></p>)}</div></section>
+      <section className="campaign-stage-panel"><div className="stage-heading"><span>5</span><div><p className="eyebrow">Creative</p><h2>Generated creative brief</h2></div></div><p><strong>Hero products:</strong> {heroNames}</p><p><strong>Core message:</strong> Warm, useful country-home inspiration with a clear reason to shop now. Adapt the hook, body copy, image/video treatment and CTA to each selected channel while keeping the campaign message consistent.</p><p><strong>Objective:</strong> {objective}</p></section>
+      <section className="campaign-stage-panel"><div className="stage-heading"><span>6</span><div><p className="eyebrow">Schedule / execute / measure</p><h2>Create the reusable campaign workflow</h2></div></div><p>Saving creates calendar timing, creative drafts, approval-gated scheduling/execution, and post-campaign metrics review for each selected channel.</p><button className="primary-button" onClick={createCampaign} disabled={saving || !selectedProducts.length || !channels.length}>{saving ? "Creating…" : "Create Campaign Plan"}</button>{message && <p className="status-message"><strong>{message}</strong></p>}</section>
 
-      <section className="campaign-stage-panel">
-        <div className="stage-heading"><span>5</span><div><p className="eyebrow">Creative</p><h2>Generated creative brief</h2></div></div>
-        <p><strong>Hero products:</strong> {heroNames}</p>
-        <p><strong>Core message:</strong> Warm, useful country-home inspiration with a clear reason to shop now. Adapt the hook, body copy, image/video treatment and CTA to each selected channel while keeping the campaign message consistent.</p>
-        <p><strong>Objective:</strong> {objective}</p>
-      </section>
+      <nav className="campaign-stepper" aria-label="Campaign progress"><span className="done">✓ Campaign Details</span><span className="active">2 Products to Promote</span><a href="#channels">3 Channels & Schedule</a><span>4 Review & Launch</span><a className="next-button" href="#channels">Next: Channels & Schedule →</a></nav>
 
-      <section className="campaign-stage-panel">
-        <div className="stage-heading"><span>6</span><div><p className="eyebrow">Schedule / execute / measure</p><h2>Create the reusable campaign workflow</h2></div></div>
-        <p>Saving creates calendar timing, creative drafts, approval-gated scheduling/execution, and post-campaign metrics review for each selected channel.</p>
-        <button className="primary-button" onClick={createCampaign} disabled={saving || !selectedProducts.length || !channels.length}>{saving ? "Creating…" : "Create Campaign Plan"}</button>
-        {message && <p className="status-message"><strong>{message}</strong></p>}
-      </section>
-
-      <nav className="campaign-stepper" aria-label="Campaign progress">
-        <span className="done">✓ Campaign Details</span>
-        <span className="active">2 What to Promote</span>
-        <a href="#channels">3 Channels & Schedule</a>
-        <span>4 Review & Launch</span>
-        <a className="next-button" href="#channels">Next: Channels & Schedule →</a>
-      </nav>
-
-      {campaigns.length > 0 && (
-        <section className="campaign-history">
-          <h2>Saved campaign workflows</h2>
-          {campaigns.map((campaign) => (
-            <details key={campaign.id}><summary>{campaign.name} · {campaign.status}</summary><p>{campaign.startDate.slice(0, 10)} → {campaign.endDate.slice(0, 10)} · {campaign.products.length} products · {campaign.recommendations.length} channel plans</p></details>
-          ))}
-        </section>
-      )}
+      {campaigns.length > 0 && <section className="campaign-history"><h2>Saved campaign workflows</h2>{campaigns.map((campaign) => <details key={campaign.id}><summary>{campaign.name} · {campaign.status}</summary><p>{campaign.startDate.slice(0, 10)} → {campaign.endDate.slice(0, 10)} · {campaign.products.length} products · {campaign.recommendations.length} channel plans</p></details>)}</section>}
     </main>
   );
 }
