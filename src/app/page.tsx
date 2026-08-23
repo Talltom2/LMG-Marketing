@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 const sections = [
   ["Product Intelligence", "Find high-conversion products that need traffic and high-traffic products that need corrective action."],
   ["Channel Intelligence", "Compare WooCommerce, marketplaces, Pinterest, email, social, search and referral performance."],
-  ["Marketing Calendar", "Plan monthly themes, hero products, campaigns, creative, emails and promotional activity."],
+  ["Campaign Builder", "Select products and promotional tools, use a recommended calendar, create creative, schedule execution and measure results."],
   ["Recommendations", "Turn observations into approved, deferred, modified or rejected actions and measure the result."],
 ];
 
@@ -90,7 +90,7 @@ export default async function Home() {
         <p className="eyebrow">Laughing Moose Gifts</p>
         <h1>Marketing Intelligence</h1>
         <p className="subtitle">Data → Observation → Diagnosis → Recommendation → Decision → Action → Result → Learning</p>
-        <p><Link href="/diagnostics">Open Diagnostic Center →</Link></p>
+        <p><Link href="/campaigns">Open Campaign Builder →</Link> · <Link href="/diagnostics">Diagnostic Center →</Link></p>
       </header>
 
       <section className="scorecards">
@@ -181,6 +181,7 @@ export default async function Home() {
           <article className="module" key={title}>
             <h3>{title}</h3>
             <p>{description}</p>
+            {title === "Campaign Builder" && <p><Link href="/campaigns">Build a campaign →</Link></p>}
           </article>
         ))}
       </section>
