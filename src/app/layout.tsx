@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import GlobalCampaignNav from "@/components/GlobalCampaignNav";
 import "./globals.css";
 import "./site-additions.css";
+import "./nav-bridge.css";
 
 export const metadata:Metadata={
   title:"LMG Marketing Intelligence",
