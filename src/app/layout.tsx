@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./site-additions.css";
 
 export const metadata: Metadata = {
   title: "LMG Marketing Intelligence",
