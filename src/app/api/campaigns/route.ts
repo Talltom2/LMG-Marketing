@@ -45,20 +45,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body: Record<string, unknown> = await request.json();
     const name = String(body.name || "").trim();
     const objective = String(body.objective || "").trim();
-    const productSkus = Array.isArray(body.productSkus) ? body.productSkus.map(String) : [];
-    const requestedChannels = Array.isArray(body.channels) ? body.channels.map(String) : [];
-    const startDate = new Date(body.startDate);
-    const endDate = new Date(body.endDate);
+    const productSkus: string[] = Array.isArray(body.productSkus) ? body.productSkus.map((value) => String(value)) : [];
+    const requestedChannels: string[] = Array.isArray(body.channels) ? body.channels.map((value) => String(value)) : [];
+    const startDate = new Date(String(body.startDate || ""));
+    const endDate = new Date(String(body.endDate || ""));
 
     if (!name || !productSkus.length || !requestedChannels.length || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       return NextResponse.json({ error: "Name, dates, at least one product and at least one channel are required." }, { status: 400 });
     }
 
     const products = await db.product.findMany({ where: { sku: { in: productSkus }, active: true } });
-    const validTypes = requestedChannels.filter((value): value is ChannelType => Object.values(ChannelType).includes(value as ChannelType));
+    const validTypes = requestedChannels.filter((value: string): value is ChannelType => Object.values(ChannelType).includes(value as ChannelType));
     const channels = await db.channel.findMany({ where: { type: { in: validTypes }, active: true } });
     const channelByType = new Map(channels.map((channel) => [channel.type, channel]));
 
