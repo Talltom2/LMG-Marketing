@@ -8,7 +8,6 @@ main { max-width: 1240px; margin: 0 auto; padding: 34px 28px 96px; }
 h1, h2, h3, h4, p { margin-top: 0; }
 .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; font-weight: 800; color: #356331; }
 
-/* Shared legacy dashboard styles */
 .scorecards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 30px 0; }
 .card, .panel, .module { background: white; border: 1px solid #dde1d8; border-radius: 16px; }
 .card { padding: 20px; }
@@ -19,7 +18,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .module { padding: 24px; }
 .module p { color: #687168; line-height: 1.55; }
 
-/* Campaign Builder */
 .campaign-shell { max-width: 1380px; }
 .campaign-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .campaign-links { margin: 4px 0 0; font-size: .9rem; color: #667166; }
@@ -27,19 +25,26 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .campaign-workspace,
 .campaign-stage-panel,
 .campaign-history { background: rgba(255,255,255,.88); border: 1px solid #d7e2c4; border-radius: 20px; box-shadow: 0 10px 30px rgba(47,76,35,.05); }
-.campaign-details-card { padding: 18px 22px; margin-bottom: 16px; background: #f9fbf4; }
+.campaign-details-card { padding: 22px; margin-bottom: 16px; background: linear-gradient(180deg,#fbfdf7 0%,#f5f9ec 100%); }
+.campaign-card-step-title { margin: 0 0 8px; color: #1d5a23; font-size: clamp(1.55rem, 2.6vw, 2.15rem); line-height: 1.1; letter-spacing: .01em; }
+.date-recommendation-copy { max-width: 980px; margin-bottom: 16px; color: #53624d; line-height: 1.45; }
 .campaign-details-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin-bottom: 12px; }
 .campaign-details-card label { display: grid; gap: 6px; font-size: .78rem; font-weight: 700; color: #53624d; }
 .campaign-details-card input,
 .campaign-details-card textarea,
 .promotion-pane input { width: 100%; padding: 10px 12px; border: 1px solid #bdc8b6; border-radius: 8px; background: white; color: #182018; }
+.recommendation-tag { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: #e6f1d9; color: #2e662e; font-size: .68rem; font-weight: 800; vertical-align: middle; }
+.date-approval-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.date-status { padding: 7px 10px; border-radius: 999px; font-size: .8rem; font-weight: 800; }
+.date-status.recommended { background: #e7f2dc; color: #2a682b; }
+.date-status.overridden { background: #fff0cf; color: #8a5f00; }
 
 .campaign-workspace { padding: 30px; background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(250,252,244,.95)); }
 .campaign-name-title { margin: 0 0 8px; color: #174e1c; font-size: clamp(2.35rem, 4.7vw, 4rem); line-height: .98; letter-spacing: -.045em; }
 .campaign-step-title { margin: 14px 0 6px; color: #1d5a23; font-size: clamp(1.55rem, 2.6vw, 2.15rem); line-height: 1.1; text-transform: uppercase; letter-spacing: .035em; }
 .campaign-section-title { margin: 10px 0 10px; color: #203d21; font-size: 1.35rem; line-height: 1.2; }
 .campaign-intro { max-width: 650px; margin-bottom: 14px; font-size: 1rem; line-height: 1.45; color: #39453a; }
-.campaign-divider { width: 100%; height: 4px; margin: 14px 0 20px; border-radius: 99px; background: #236b26; box-shadow: 0 1px 0 rgba(255,255,255,.6) inset; }
+.campaign-divider { width: 100%; height: 5px; margin: 14px 0 20px; border-radius: 99px; background: #1f6223; box-shadow: 0 1px 0 rgba(255,255,255,.6) inset; }
 
 .promotion-columns { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 22px; }
 .promotion-pane { min-width: 0; padding: 18px; border: 1px solid #d9e4c8; border-radius: 16px; background: linear-gradient(180deg,#ffffff 0%,#fbfcf7 100%); }
