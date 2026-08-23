@@ -4,6 +4,7 @@ const links=[
   ["/","Marketing Intelligence"],
   ["/campaigns","Campaign Builder"],
   ["/campaigns/calendar","Campaign Calendar"],
+  ["/campaigns/production","Creative Studio"],
   ["/campaigns/metrics","Campaign Metrics"],
   ["/campaigns/diagnostics","Diagnostic Center"],
   ["/campaigns/alerts","Alerts"],
