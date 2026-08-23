@@ -13,11 +13,16 @@ h2, h3, p { margin-top: 0; }
 .card span, .card small { display: block; color: #687168; }
 .card strong { display: block; font-size: 2rem; margin: 12px 0; }
 .panel { padding: 28px; margin: 18px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 28px; }
-.campaign-products-panel { display: block; }
+/* Campaign Builder: remove the inherited 1/3 column from “What to promote”.
+   Its own inner grid is then a true 50/50 product-search / collections layout. */
+main > section.panel:nth-of-type(3) { display: block; }
+main > section.panel:nth-of-type(3) > .eyebrow,
+main > section.panel:nth-of-type(3) > h2,
+main > section.panel:nth-of-type(3) > p { width: calc(50% - 14px); }
 .empty-state { padding: 24px; background: #f7f8f5; border-radius: 12px; }
 .empty-state p { margin: 8px 0 0; color: #687168; }
 .modules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 18px; }
 .module { padding: 24px; }
 .module p { color: #687168; line-height: 1.55; }
-@media (max-width: 900px) { .scorecards { grid-template-columns: repeat(2, 1fr); } .panel { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .scorecards { grid-template-columns: repeat(2, 1fr); } .panel { grid-template-columns: 1fr; } main > section.panel:nth-of-type(3) > .eyebrow, main > section.panel:nth-of-type(3) > h2, main > section.panel:nth-of-type(3) > p { width: 100%; } }
 @media (max-width: 600px) { main { padding: 28px 18px 60px; } .scorecards, .modules { grid-template-columns: 1fr; } }
