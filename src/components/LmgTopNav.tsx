@@ -5,7 +5,9 @@ const links=[
   ["/campaigns","Campaign Builder"],
   ["/campaigns/calendar","Campaign Calendar"],
   ["/campaigns/metrics","Campaign Metrics"],
-  ["/diagnostics","Diagnostic Center"],
+  ["/campaigns/diagnostics","Diagnostic Center"],
+  ["/campaigns/alerts","Alerts"],
+  ["/campaigns/closeout","Closeout & Learning"],
 ] as const;
 
 function LmgLogo(){
