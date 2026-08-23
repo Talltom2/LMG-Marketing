@@ -1,6 +1,7 @@
 import { ChannelType, RecommendationStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getWebsiteProductHealth } from "@/lib/integrations/woocommerce/product-health";
 
 const channelOffsets: Partial<Record<ChannelType, number>> = {
   EMAIL: 0,
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     const body: Record<string, unknown> = await request.json();
     const name = String(body.name || "").trim();
     const objective = String(body.objective || "").trim();
-    const productSkus: string[] = Array.isArray(body.productSkus) ? body.productSkus.map((value) => String(value)) : [];
+    const productSkus: string[] = Array.isArray(body.productSkus) ? body.productSkus.map((value) => String(value).trim()).filter(Boolean) : [];
     const requestedChannels: string[] = Array.isArray(body.channels) ? body.channels.map((value) => String(value)) : [];
     const startDate = new Date(String(body.startDate || ""));
     const endDate = new Date(String(body.endDate || ""));
@@ -57,7 +58,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name, dates, at least one product and at least one channel are required." }, { status: 400 });
     }
 
-    const products = await db.product.findMany({ where: { sku: { in: productSkus }, active: true } });
+    let products = await db.product.findMany({ where: { sku: { in: productSkus }, active: true } });
+    const existingSkus = new Set(products.map((product) => product.sku));
+    const missingSkus = productSkus.filter((sku) => !existingSkus.has(sku));
+
+    if (missingSkus.length) {
+      const website = await getWebsiteProductHealth();
+      const catalogBySku = new Map(
+        website.products
+          .filter((product) => String(product.sku ?? "").trim())
+          .map((product) => [String(product.sku).trim(), product]),
+      );
+
+      for (const sku of missingSkus) {
+        const catalogProduct = catalogBySku.get(sku);
+        if (!catalogProduct) continue;
+        await db.product.upsert({
+          where: { sku },
+          update: { name: catalogProduct.name, active: true },
+          create: { sku, name: catalogProduct.name, active: true },
+        });
+      }
+
+      products = await db.product.findMany({ where: { sku: { in: productSkus }, active: true } });
+    }
+
+    if (!products.length) {
+      return NextResponse.json({ error: "None of the selected products could be resolved in WooCommerce or the intelligence database." }, { status: 400 });
+    }
+
     const validTypes = requestedChannels.filter((value: string): value is ChannelType => Object.values(ChannelType).includes(value as ChannelType));
     const channels = await db.channel.findMany({ where: { type: { in: validTypes }, active: true } });
     const channelByType = new Map(channels.map((channel) => [channel.type, channel]));
