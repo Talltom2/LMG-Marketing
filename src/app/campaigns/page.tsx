@@ -24,6 +24,14 @@ type SavedCampaign = {
   recommendations: { id: string; title: string; recommendation: string; actions: { actionType: string; description: string; executionTarget?: string | null; completed: boolean }[] }[];
 };
 
+type ProductCollection = {
+  id: string;
+  name: string;
+  skus: string[];
+};
+
+const COLLECTION_STORAGE_KEY = "lmg-marketing-product-collections-v1";
+
 const channelOptions = [
   ["WOOCOMMERCE", "WooCommerce", "Primary store landing pages, offers and onsite merchandising"],
   ["PINTEREST", "Pinterest", "Pins, boards and discovery traffic"],
@@ -51,6 +59,10 @@ export default function CampaignBuilderPage() {
   const [endDate, setEndDate] = useState(isoDate(addDays(today, 22)));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collections, setCollections] = useState<ProductCollection[]>([]);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [collectionMessage, setCollectionMessage] = useState("");
 
   async function refresh() {
     const [productResponse, campaignResponse] = await Promise.all([
@@ -70,10 +82,24 @@ export default function CampaignBuilderPage() {
     }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    try {
+      const saved = window.localStorage.getItem(COLLECTION_STORAGE_KEY);
+      if (saved) setCollections(JSON.parse(saved));
+    } catch {
+      setCollections([]);
+    }
+  }, []);
 
   const selectedRows = useMemo(() => products.filter((product) => selectedProducts.includes(product.sku)), [products, selectedProducts]);
   const recommendedProducts = products.filter((product) => product.signal === "PROMOTE");
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleProducts = useMemo(() => {
+    if (!normalizedSearch) return products;
+    return products.filter((product) => product.sku.toLowerCase().includes(normalizedSearch) || product.name.toLowerCase().includes(normalizedSearch));
+  }, [products, normalizedSearch]);
+
   const start = new Date(`${startDate}T12:00:00`);
   const calendar = channels.map((type) => {
     const offset = type === "PINTEREST" ? -7 : type === "EMAIL" || type === "WOOCOMMERCE" ? 0 : type === "BING" ? -5 : -3;
@@ -83,12 +109,53 @@ export default function CampaignBuilderPage() {
 
   const heroNames = selectedRows.slice(0, 3).map((row) => row.name).join(", ") || "selected products";
 
+  function persistCollections(next: ProductCollection[]) {
+    setCollections(next);
+    window.localStorage.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(next));
+  }
+
   function toggleProduct(sku: string) {
     setSelectedProducts((current) => current.includes(sku) ? current.filter((item) => item !== sku) : [...current, sku]);
   }
 
   function toggleChannel(type: string) {
     setChannels((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
+  }
+
+  function createCollection() {
+    const trimmedName = newCollectionName.trim();
+    if (!trimmedName) {
+      setCollectionMessage("Enter a collection name first.");
+      return;
+    }
+    if (!selectedProducts.length) {
+      setCollectionMessage("Select at least one product before saving a collection.");
+      return;
+    }
+    const next: ProductCollection = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmedName,
+      skus: [...selectedProducts],
+    };
+    persistCollections([...collections, next]);
+    setNewCollectionName("");
+    setCollectionMessage(`${trimmedName} saved with ${selectedProducts.length} product${selectedProducts.length === 1 ? "" : "s"}.`);
+  }
+
+  function addCollectionToCampaign(collection: ProductCollection) {
+    setSelectedProducts((current) => Array.from(new Set([...current, ...collection.skus])));
+    setCollectionMessage(`${collection.name} added to this campaign.`);
+  }
+
+  function replaceWithCollection(collection: ProductCollection) {
+    setSelectedProducts(collection.skus);
+    setCollectionMessage(`${collection.name} is now the campaign product set.`);
+  }
+
+  function deleteCollection(id: string) {
+    const collection = collections.find((item) => item.id === id);
+    persistCollections(collections.filter((item) => item.id !== id));
+    setCollectionMessage(collection ? `${collection.name} deleted.` : "Collection deleted.");
   }
 
   async function createCampaign() {
@@ -116,13 +183,14 @@ export default function CampaignBuilderPage() {
       <header>
         <p className="eyebrow">LMG Marketing</p>
         <h1>Campaign Builder</h1>
-        <p className="subtitle">Campaign → Products → Channels → Calendar → Creative → Approval / Execution → Metrics → Diagnostics → Learning</p>
+        <p className="subtitle">Campaign → Products / Collections → Channels → Calendar → Creative → Approval / Execution → Metrics → Diagnostics → Learning</p>
         <p><Link href="/">← Marketing Intelligence</Link> · <Link href="/diagnostics">Diagnostic Center →</Link></p>
       </header>
 
       <section className="scorecards">
         <article className="card"><span>Recommended products</span><strong>{recommendedProducts.length}</strong><small>30-day intelligence signal</small></article>
         <article className="card"><span>Selected products</span><strong>{selectedProducts.length}</strong><small>Hero + support products</small></article>
+        <article className="card"><span>Saved collections</span><strong>{collections.length}</strong><small>Reusable product groups</small></article>
         <article className="card"><span>Promotion tools</span><strong>{channels.length}</strong><small>Selected channels</small></article>
         <article className="card"><span>Saved campaigns</span><strong>{campaigns.length}</strong><small>Reusable campaign history</small></article>
       </section>
@@ -139,13 +207,47 @@ export default function CampaignBuilderPage() {
       </section>
 
       <section className="panel">
-        <p className="eyebrow">2 · Products</p>
-        <h2>Choose what to promote</h2>
-        <p>Products marked <strong>PROMOTE</strong> already convert comparatively well but need more traffic; the intelligence engine therefore surfaces them first.</p>
+        <p className="eyebrow">2 · What to promote</p>
+        <h2>Find products or use a collection</h2>
+        <p>Search by SKU, full product name, or any part of the product name. Products marked <strong>PROMOTE</strong> already convert comparatively well but need more traffic.</p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,2fr) minmax(220px,1fr)", gap: 16, alignItems: "end", marginBottom: 16 }}>
+          <label><strong>Search products</strong><br />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="SKU or product name — e.g. Rustic Rooster"
+              style={{ width: "100%" }}
+            />
+          </label>
+          <div><strong>{visibleProducts.length}</strong> matching product{visibleProducts.length === 1 ? "" : "s"}</div>
+        </div>
+
+        {collections.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <h3>Saved collections</h3>
+            <div className="modules">
+              {collections.map((collection) => (
+                <article className="module" key={collection.id}>
+                  <h3>{collection.name}</h3>
+                  <p>{collection.skus.length} product{collection.skus.length === 1 ? "" : "s"}</p>
+                  <p><small>{collection.skus.slice(0, 5).join(", ")}{collection.skus.length > 5 ? "…" : ""}</small></p>
+                  <p>
+                    <button type="button" onClick={() => replaceWithCollection(collection)}>Promote collection</button>{" "}
+                    <button type="button" onClick={() => addCollectionToCampaign(collection)}>Add to selection</button>{" "}
+                    <button type="button" onClick={() => deleteCollection(collection.id)}>Delete</button>
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ maxHeight: 430, overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr><th align="left">Use</th><th align="left">Product</th><th align="left">Signal</th><th align="right">Views</th><th align="right">Conversion</th><th align="right">30d Revenue</th></tr></thead>
-            <tbody>{products.map((product) => (
+            <tbody>{visibleProducts.map((product) => (
               <tr key={product.sku}>
                 <td><input type="checkbox" checked={selectedProducts.includes(product.sku)} onChange={() => toggleProduct(product.sku)} /></td>
                 <td><strong>{product.name}</strong><br /><small>{product.sku}</small></td>
@@ -156,6 +258,22 @@ export default function CampaignBuilderPage() {
               </tr>
             ))}</tbody>
           </table>
+        </div>
+
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #ddd" }}>
+          <h3>Create a collection from the current selection</h3>
+          <p>Use this for related product families such as Rustic Rooster, Autumn Checkerboard, candles, potholders, or any hand-picked merchandising group.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              value={newCollectionName}
+              onChange={(e) => setNewCollectionName(e.target.value)}
+              placeholder="Collection name — e.g. Rustic Rooster"
+              style={{ minWidth: 300 }}
+            />
+            <button type="button" onClick={createCollection}>Save selected as collection</button>
+            <button type="button" onClick={() => setSelectedProducts([])}>Clear selection</button>
+          </div>
+          {collectionMessage && <p><strong>{collectionMessage}</strong></p>}
         </div>
       </section>
 
