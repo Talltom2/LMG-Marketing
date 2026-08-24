@@ -6,7 +6,9 @@ const STORAGE_KEY="lmg-campaign-generated-visuals-v1";
 const SCHEDULED_KEY="lmg-campaign-scheduled-opportunities-v1";
 const INSTANCE_KEY="lmg-campaign-instance-v1";
 type VisualMap=Record<string,string>;
-type ScheduleMap=Record<string,{queuedAt:string;channel:string;opportunity:string}>;
+type ScheduleStatus="QUEUED"|"SCHEDULED";
+type ScheduleItem={queuedAt:string;channel:string;opportunity:string;status?:ScheduleStatus;startDate?:string;endDate?:string;destinationUrl?:string;slot?:string};
+type ScheduleMap=Record<string,ScheduleItem>;
 
 function readStored():VisualMap{try{return JSON.parse(sessionStorage.getItem(STORAGE_KEY)??"{}") as VisualMap;}catch{return{};}}
 function writeStored(value:VisualMap){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(value));}catch{}}
@@ -17,6 +19,10 @@ function campaignInstance(){try{let id=sessionStorage.getItem(INSTANCE_KEY);if(!
 function renewCampaignInstance(){try{const id=newInstanceId();sessionStorage.setItem(INSTANCE_KEY,id);return id;}catch{return"session";}}
 function labelFromOption(text:string){return text.replace(/\s·\s(?:SOURCE|RECOMMENDED|APPROVED)$/i,"").trim();}
 function setText(el:HTMLElement|null,value:string){if(el&&el.textContent!==value)el.textContent=value;}
+function homepageSlot(channel:string,opportunity:string){if(channel!=="Website Homepage")return"";if(/Homepage Hero Feature/i.test(opportunity))return"WEBSITE_HOMEPAGE:HERO";if(/Supporting Homepage Module/i.test(opportunity))return"WEBSITE_HOMEPAGE:MODULE";return"WEBSITE_HOMEPAGE:OTHER";}
+function isHomepageOpportunity(item:ScheduleItem){return item.channel==="Website Homepage";}
+function rangesOverlap(aStart:string,aEnd:string,bStart:string,bEnd:string){return aStart<=bEnd&&bStart<=aEnd;}
+function validHttpUrl(value:string){try{const u=new URL(value);return u.protocol==="http:"||u.protocol==="https:";}catch{return false;}}
 
 export default function CampaignVisualProductionBridge(){
  useEffect(()=>{
@@ -38,6 +44,9 @@ export default function CampaignVisualProductionBridge(){
 
   const opportunityKey=(card:HTMLElement)=>`${campaignInstance()}::${card.querySelector(".eyebrow")?.textContent?.trim()??""}::${card.querySelector("h3")?.textContent?.trim()??""}`;
   const isApproved=(card:HTMLElement)=>card.querySelector(".creative-version")?.textContent?.includes("APPROVED")??false;
+  const campaignDates=()=>{const dates=Array.from(document.querySelectorAll<HTMLInputElement>('input[type="date"]')).map(i=>i.value).filter(Boolean);return{start:dates[0]??new Date().toISOString().slice(0,10),end:dates[1]??dates[0]??new Date().toISOString().slice(0,10)};};
+  const conflictFor=(key:string,item:ScheduleItem,startDate:string,endDate:string)=>{const slot=item.slot||homepageSlot(item.channel,item.opportunity);if(!slot)return null;for(const[otherKey,other]of Object.entries(readScheduled())){if(otherKey===key||other.status!=="SCHEDULED")continue;const otherSlot=other.slot||homepageSlot(other.channel,other.opportunity);if(otherSlot!==slot||!other.startDate||!other.endDate)continue;if(rangesOverlap(startDate,endDate,other.startDate,other.endDate))return other;}return null;};
+
   const renderStep8Queue=()=>{
     const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;
     const scheduled=readScheduled();
@@ -45,8 +54,10 @@ export default function CampaignVisualProductionBridge(){
     const prefix=`${campaignInstance()}::`;
     const entries=Object.entries(scheduled).filter(([key])=>key.startsWith(prefix));
     if(!entries.length){panel?.remove();return;}
-    if(!panel){panel=document.createElement("section");panel.dataset.lmgStep8="1";panel.className="campaign-stage-panel";section.insertAdjacentElement("afterend",panel);}
-    panel.innerHTML=`<div class="stage-heading"><span>8</span><div><p class="eyebrow">Incremental scheduling queue</p><h2>Approved opportunities ready for scheduling</h2></div></div><p class="approval-note">Only newly approved opportunities are added. Previously queued opportunities are skipped automatically.</p><div class="calendar-list">${entries.map(([,item])=>`<p><strong>Queued</strong><span><b>${item.channel}</b> · ${item.opportunity}</span></p>`).join("")}</div>`;
+    if(!panel){panel=document.createElement("section");panel.dataset.lmgStep8="1";panel.className="campaign-stage-panel lmg-step8-panel";section.insertAdjacentElement("afterend",panel);}
+    const defaultDates=campaignDates();
+    panel.innerHTML=`<div class="stage-heading"><span>8</span><div><p class="eyebrow">Scheduling preflight</p><h2>Approved opportunities ready for scheduling</h2></div></div><p class="approval-note">Confirm timing and destination before external publication. Homepage hero/module reservations are checked for conflicts before scheduling.</p><div class="lmg-schedule-list">${entries.map(([key,item])=>{const start=item.startDate||defaultDates.start,end=item.endDate||defaultDates.end,home=isHomepageOpportunity(item),status=item.status||"QUEUED";return `<article class="lmg-schedule-item" data-schedule-key="${key}"><div class="lmg-schedule-item-head"><strong>${status==="SCHEDULED"?"✓ Scheduled":"Queued"}</strong><span><b>${item.channel}</b> · ${item.opportunity}</span></div><div class="lmg-schedule-fields"><label>Start date<input type="date" data-schedule-start value="${start}"></label><label>End date<input type="date" data-schedule-end value="${end}"></label>${home?`<label class="lmg-destination-field">Destination product URL<input type="url" data-schedule-url value="${item.destinationUrl??""}" placeholder="https://laughingmoosegifts.com/product/..." required></label>`:""}</div><p class="lmg-schedule-status" data-schedule-status>${status==="SCHEDULED"?"Reservation confirmed. This opportunity is ready for the channel publication executor.":"Not yet scheduled."}</p><button type="button" data-confirm-schedule ${status==="SCHEDULED"?"disabled":""}>${status==="SCHEDULED"?"Scheduled":"Check Conflict & Confirm Schedule"}</button></article>`}).join("")}</div>`;
+    for(const row of Array.from(panel.querySelectorAll<HTMLElement>(".lmg-schedule-item"))){const key=row.dataset.scheduleKey??"";const button=row.querySelector<HTMLButtonElement>("[data-confirm-schedule]");if(!button||button.disabled)continue;button.addEventListener("click",()=>{const latest=readScheduled();const item=latest[key];if(!item)return;const start=row.querySelector<HTMLInputElement>("[data-schedule-start]")?.value??"";const end=row.querySelector<HTMLInputElement>("[data-schedule-end]")?.value??"";const url=row.querySelector<HTMLInputElement>("[data-schedule-url]")?.value.trim()??"";const status=row.querySelector<HTMLElement>("[data-schedule-status]");if(!start||!end||start>end){setText(status,"Choose a valid start and end date before scheduling.");row.dataset.scheduleState="error";return;}if(isHomepageOpportunity(item)&&!validHttpUrl(url)){setText(status,"A valid destination product URL is required for homepage hero/module creative.");row.dataset.scheduleState="error";return;}const slot=homepageSlot(item.channel,item.opportunity);const conflict=conflictFor(key,{...item,slot},start,end);if(conflict){setText(status,`Scheduling conflict: ${conflict.opportunity} already occupies this homepage slot from ${conflict.startDate} through ${conflict.endDate}. Change the dates before scheduling.`);row.dataset.scheduleState="conflict";return;}latest[key]={...item,status:"SCHEDULED",startDate:start,endDate:end,destinationUrl:url||undefined,slot};writeScheduled(latest);row.dataset.scheduleState="scheduled";renderStep8Queue();enhanceIncrementalScheduling();},true);}
   };
   const enhanceIncrementalScheduling=()=>{
     const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;
@@ -55,7 +66,7 @@ export default function CampaignVisualProductionBridge(){
     const scheduled=readScheduled();
     const eligible=cards.filter(card=>isApproved(card)&&!scheduled[opportunityKey(card)]);
     button.disabled=eligible.length===0;
-    button.textContent=eligible.length?`Schedule ${eligible.length} Approved Opportunit${eligible.length===1?"y":"ies"}`:"No Newly Approved Opportunities to Schedule";
+    button.textContent=eligible.length?`Send ${eligible.length} Approved Opportunit${eligible.length===1?"y":"ies"} to Scheduling Preflight`:"No Newly Approved Opportunities to Schedule";
     if(button.dataset.lmgIncrementalSchedule!=="1"){
       button.dataset.lmgIncrementalSchedule="1";
       button.addEventListener("click",event=>{
@@ -63,7 +74,7 @@ export default function CampaignVisualProductionBridge(){
         const latest=readScheduled();
         const currentCards=Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"));
         const now=new Date().toISOString();
-        for(const card of currentCards){if(!isApproved(card))continue;const key=opportunityKey(card);if(latest[key])continue;latest[key]={queuedAt:now,channel:card.querySelector(".eyebrow")?.textContent?.trim()??"",opportunity:card.querySelector("h3")?.textContent?.trim()??""};}
+        for(const card of currentCards){if(!isApproved(card))continue;const key=opportunityKey(card);if(latest[key])continue;const channel=card.querySelector(".eyebrow")?.textContent?.trim()??"",opportunity=card.querySelector("h3")?.textContent?.trim()??"";latest[key]={queuedAt:now,channel,opportunity,status:"QUEUED",slot:homepageSlot(channel,opportunity)||undefined};}
         writeScheduled(latest);renderStep8Queue();enhanceIncrementalScheduling();
       },true);
     }
