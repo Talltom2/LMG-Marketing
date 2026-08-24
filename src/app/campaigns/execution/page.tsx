@@ -18,7 +18,7 @@ const actionLabel:Record<string,string>={
 
 function instanceKey(c:Campaign){
   const skus=c.products.map(p=>p.product.sku).sort().join(",");
-  return [c.name.trim().toLowerCase(),c.startDate.slice(0,10),c.endDate.slice(0,10),skus].join("|");
+  return [c.name.trim().toLowerCase(),c.startDate.slice(0,10),skus].join("|");
 }
 
 function actionKey(a:Action){return [a.actionType,a.executionTarget??"",a.description].join("|")}
@@ -98,7 +98,7 @@ export default function CampaignExecutionPage(){
             <div>
               <h2 style={{margin:"0 0 6px",fontSize:22}}>{c.name}</h2>
               <div style={{fontSize:13,color:"#6b7280"}}>{new Date(c.startDate).toLocaleDateString()} – {new Date(c.endDate).toLocaleDateString()} · {c.products.length} product{c.products.length===1?"":"s"}</div>
-              {c.sourceIds.length>1&&<div style={{fontSize:12,color:"#92400e",marginTop:5}}>Consolidated {c.sourceIds.length} duplicate planning saves into this single execution record.</div>}
+              {c.sourceIds.length>1&&<div style={{fontSize:12,color:"#92400e",marginTop:5}}>Consolidated {c.sourceIds.length} planning saves into this single execution record.</div>}
             </div>
             <span style={{padding:"6px 10px",borderRadius:999,fontSize:12,fontWeight:800,background:allReady?"#ecfdf5":"#fff7ed",color:allReady?"#065f46":"#9a3412"}}>{allReady?"EXECUTION READY":"INCOMPLETE"}</span>
           </div>
