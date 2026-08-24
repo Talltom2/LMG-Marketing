@@ -13,8 +13,8 @@ const links=[
   ["/promotional-assets","Opportunities"],
 ] as const;
 
-export default function LmgTopNav({active}:{active?:string}){
-  return <nav aria-label="LMG Marketing" style={{maxWidth:1540,margin:"0 auto",padding:"12px 20px",display:"flex",alignItems:"center",gap:8,overflowX:"auto",whiteSpace:"nowrap",WebkitOverflowScrolling:"touch",scrollbarWidth:"thin"}}>
+export default function LmgTopNav({active,global=false}:{active?:string;global?:boolean}){
+  return <nav aria-label="LMG Marketing" data-lmg-global={global?"true":"false"} style={{maxWidth:1540,margin:"0 auto",padding:"12px 20px",display:"flex",alignItems:"center",gap:8,overflowX:"auto",whiteSpace:"nowrap",WebkitOverflowScrolling:"touch",scrollbarWidth:"thin"}}>
     <Link href="/" style={{fontWeight:900,fontSize:15,textDecoration:"none",color:"#17351d",paddingRight:8,flex:"0 0 auto"}}>LMG Marketing</Link>
     {links.map(([href,label])=>{
       const selected=href==="/"?active==="/":active===href||Boolean(active?.startsWith(`${href}/`));
