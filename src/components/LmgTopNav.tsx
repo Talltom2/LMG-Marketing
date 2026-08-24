@@ -14,11 +14,13 @@ const links=[
 ] as const;
 
 export default function LmgTopNav({active,global=false}:{active?:string;global?:boolean}){
-  return <nav aria-label="LMG Marketing" data-lmg-global={global?"true":"false"} style={{maxWidth:1540,margin:"0 auto",padding:"12px 20px",display:"flex",alignItems:"center",gap:8,overflowX:"auto",whiteSpace:"nowrap",WebkitOverflowScrolling:"touch",scrollbarWidth:"thin"}}>
-    <Link href="/" style={{fontWeight:900,fontSize:15,textDecoration:"none",color:"#17351d",paddingRight:8,flex:"0 0 auto"}}>LMG Marketing</Link>
-    {links.map(([href,label])=>{
-      const selected=href==="/"?active==="/":active===href||Boolean(active?.startsWith(`${href}/`));
-      return <Link key={href} href={href} style={{flex:"0 0 auto",display:"inline-block",padding:"7px 9px",borderRadius:8,textDecoration:"none",fontSize:13,fontWeight:800,lineHeight:1,border:selected?"1px solid #18351e":"1px solid transparent",background:selected?"#18351e":"transparent",color:selected?"#fff":"#35583a"}}>{label}</Link>
-    })}
+  return <nav aria-label="LMG Marketing" data-lmg-global={global?"true":"false"} className="lmg-topnav" style={{maxWidth:1540,margin:"0 auto 22px",padding:"10px 14px",display:"flex",alignItems:"center",gap:14,overflowX:"auto",whiteSpace:"nowrap",WebkitOverflowScrolling:"touch",scrollbarWidth:"thin",borderRadius:18,background:"#050505",boxShadow:"0 10px 28px rgba(0,0,0,.22)"}}>
+    <Link href="/" className="lmg-brand" style={{fontWeight:900,fontSize:15,textDecoration:"none",color:"#fff",padding:"10px 10px 10px 6px",flex:"0 0 auto"}}>LMG Marketing</Link>
+    <div className="lmg-navlinks" style={{display:"flex",alignItems:"center",gap:5,flexWrap:"nowrap",marginLeft:"auto",minWidth:"max-content"}}>
+      {links.map(([href,label])=>{
+        const selected=href==="/"?active==="/":active===href||Boolean(active?.startsWith(`${href}/`));
+        return <Link key={href} href={href} className={selected?"active":""} style={{flex:"0 0 auto",display:"inline-block",padding:"9px 10px",borderRadius:9,textDecoration:"none",fontSize:13,fontWeight:800,lineHeight:1,border:selected?"1px solid #fff":"1px solid transparent",background:selected?"#fff":"transparent",color:selected?"#111":"#f4f6ef"}}>{label}</Link>
+      })}
+    </div>
   </nav>;
 }
