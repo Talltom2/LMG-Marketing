@@ -30,3 +30,5 @@ Every recommendation should be traceable through:
 ## First operating milestone
 
 Use LMG Marketing Intelligence to create, manage and measure the September 2026 Laughing Moose Gifts marketing plan.
+
+<!-- Deployment trigger: WordPress homepage publisher -->
