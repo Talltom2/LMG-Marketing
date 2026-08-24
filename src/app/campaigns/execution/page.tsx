@@ -3,16 +3,25 @@
 import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 
-type Action={id:string;actionType:string;description:string;executionTarget?:string|null;status?:string|null};
+type Action={id:string;actionType:string;description:string;executionTarget?:string|null;completed?:boolean};
 type Recommendation={id:string;title:string;status:string;actions:Action[]};
-type Campaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;products:{product:{sku:string;name:string}}[];recommendations:Recommendation[]};
+type Campaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;createdAt?:string;products:{product:{sku:string;name:string}}[];recommendations:Recommendation[]};
+type CampaignInstance=Campaign&{sourceIds:string[];actions:Action[]};
 
+const phaseOrder=["CALENDAR","CREATIVE_DRAFT","SCHEDULE_EXECUTION","METRICS_REVIEW"] as const;
 const actionLabel:Record<string,string>={
   CALENDAR:"Calendar",
   CREATIVE_DRAFT:"Creative",
   SCHEDULE_EXECUTION:"Schedule / Execute",
   METRICS_REVIEW:"Measurement",
 };
+
+function instanceKey(c:Campaign){
+  const skus=c.products.map(p=>p.product.sku).sort().join(",");
+  return [c.name.trim().toLowerCase(),c.startDate.slice(0,10),c.endDate.slice(0,10),skus].join("|");
+}
+
+function actionKey(a:Action){return [a.actionType,a.executionTarget??"",a.description].join("|")}
 
 export default function CampaignExecutionPage(){
   const[campaigns,setCampaigns]=useState<Campaign[]>([]);
@@ -31,19 +40,37 @@ export default function CampaignExecutionPage(){
 
   useEffect(()=>{void load()},[]);
 
-  const summary=useMemo(()=>{
-    const total=campaigns.length;
-    const planned=campaigns.filter(c=>c.status==="PLANNED").length;
-    const actionCount=campaigns.reduce((n,c)=>n+c.recommendations.reduce((m,r)=>m+(r.actions?.length??0),0),0);
-    return{total,planned,actionCount};
+  const instances=useMemo(()=>{
+    const grouped=new Map<string,CampaignInstance>();
+    for(const c of campaigns){
+      const key=instanceKey(c);
+      const currentActions=c.recommendations.flatMap(r=>r.actions??[]);
+      const existing=grouped.get(key);
+      if(!existing){
+        grouped.set(key,{...c,sourceIds:[c.id],actions:currentActions});
+        continue;
+      }
+      const existingTime=existing.createdAt?new Date(existing.createdAt).getTime():0;
+      const currentTime=c.createdAt?new Date(c.createdAt).getTime():0;
+      const base=currentTime>=existingTime?c:existing;
+      const mergedActions=[...existing.actions,...currentActions].filter((a,i,all)=>all.findIndex(x=>actionKey(x)===actionKey(a))===i);
+      grouped.set(key,{...base,sourceIds:[...existing.sourceIds,c.id],actions:mergedActions});
+    }
+    return [...grouped.values()].sort((a,b)=>(b.createdAt??"").localeCompare(a.createdAt??""));
   },[campaigns]);
+
+  const summary=useMemo(()=>{
+    const total=instances.length;
+    const ready=instances.filter(c=>phaseOrder.every(type=>c.actions.some(a=>a.actionType===type))).length;
+    return{total,ready,pending:total-ready};
+  },[instances]);
 
   return <main style={{maxWidth:1180,margin:"0 auto",padding:"34px 22px 60px",fontFamily:"Arial, sans-serif"}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:20,alignItems:"flex-start",flexWrap:"wrap"}}>
       <div>
         <p style={{margin:0,fontSize:12,fontWeight:800,letterSpacing:".12em",textTransform:"uppercase",color:"#6b7280"}}>LMG Marketing · Campaign Operations</p>
         <h1 style={{fontSize:34,margin:"8px 0 8px"}}>Execution Readiness</h1>
-        <p style={{maxWidth:760,margin:0,color:"#4b5563",lineHeight:1.55}}>This is the handoff between Campaign Builder planning and real execution. It shows exactly what the system created for each campaign: calendar timing, creative work, scheduling/execution tasks and measurement follow-up.</p>
+        <p style={{maxWidth:800,margin:0,color:"#4b5563",lineHeight:1.55}}>One campaign instance equals one execution record. Channel and opportunity work is grouped inside that execution instead of appearing as repeated top-level tasks.</p>
       </div>
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         <Link href="/campaigns" style={{padding:"10px 14px",border:"1px solid #d1d5db",borderRadius:9,textDecoration:"none",color:"#111827",fontWeight:700}}>Back to Builder</Link>
@@ -52,44 +79,55 @@ export default function CampaignExecutionPage(){
     </div>
 
     <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,margin:"26px 0"}}>
-      <Stat label="Campaigns loaded" value={summary.total}/>
-      <Stat label="Planned campaigns" value={summary.planned}/>
-      <Stat label="Execution tasks" value={summary.actionCount}/>
+      <Stat label="Execution records" value={summary.total}/>
+      <Stat label="Ready" value={summary.ready}/>
+      <Stat label="Pending" value={summary.pending}/>
       <Stat label="Workflow" value="Plan → Execute → Measure" small/>
     </section>
 
     {loading&&<div style={noticeStyle}>Loading execution state…</div>}
     {error&&<div style={{...noticeStyle,borderColor:"#fecaca",background:"#fef2f2",color:"#991b1b"}}>{error}</div>}
-    {!loading&&!error&&!campaigns.length&&<div style={noticeStyle}>No campaigns yet. Build and approve a campaign first.</div>}
+    {!loading&&!error&&!instances.length&&<div style={noticeStyle}>No campaigns yet. Build and approve a campaign first.</div>}
 
     <section style={{display:"grid",gap:18}}>
-      {campaigns.map(c=>{
-        const actions=c.recommendations.flatMap(r=>r.actions??[]);
-        const actionTypes=new Set(actions.map(a=>a.actionType));
-        const readiness=["CALENDAR","CREATIVE_DRAFT","SCHEDULE_EXECUTION","METRICS_REVIEW"].map(type=>({type,ready:actionTypes.has(type)}));
+      {instances.map(c=>{
+        const readiness=phaseOrder.map(type=>({type,ready:c.actions.some(a=>a.actionType===type)}));
         const allReady=readiness.every(x=>x.ready);
-        return <article key={c.id} style={{border:"1px solid #e5e7eb",borderRadius:14,padding:20,boxShadow:"0 2px 9px rgba(0,0,0,.04)",background:"white"}}>
+        return <article key={instanceKey(c)} style={{border:"1px solid #e5e7eb",borderRadius:14,padding:20,boxShadow:"0 2px 9px rgba(0,0,0,.04)",background:"white"}}>
           <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
             <div>
               <h2 style={{margin:"0 0 6px",fontSize:22}}>{c.name}</h2>
               <div style={{fontSize:13,color:"#6b7280"}}>{new Date(c.startDate).toLocaleDateString()} – {new Date(c.endDate).toLocaleDateString()} · {c.products.length} product{c.products.length===1?"":"s"}</div>
+              {c.sourceIds.length>1&&<div style={{fontSize:12,color:"#92400e",marginTop:5}}>Consolidated {c.sourceIds.length} duplicate planning saves into this single execution record.</div>}
             </div>
-            <span style={{padding:"6px 10px",borderRadius:999,fontSize:12,fontWeight:800,background:allReady?"#ecfdf5":"#fff7ed",color:allReady?"#065f46":"#9a3412"}}>{allReady?"EXECUTION HANDOFF READY":"INCOMPLETE HANDOFF"}</span>
+            <span style={{padding:"6px 10px",borderRadius:999,fontSize:12,fontWeight:800,background:allReady?"#ecfdf5":"#fff7ed",color:allReady?"#065f46":"#9a3412"}}>{allReady?"EXECUTION READY":"INCOMPLETE"}</span>
           </div>
 
           {c.objective&&<p style={{color:"#374151",lineHeight:1.5,marginBottom:14}}>{c.objective}</p>}
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{c.products.map(p=><span key={p.product.sku} style={{fontSize:12,padding:"5px 8px",background:"#f3f4f6",borderRadius:7}}>{p.product.name} · {p.product.sku}</span>)}</div>
 
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10,marginBottom:16}}>
-            {readiness.map(x=><div key={x.type} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:12,background:x.ready?"#f0fdf4":"#fff7ed"}}>
-              <div style={{fontSize:12,fontWeight:800,color:x.ready?"#166534":"#9a3412"}}>{x.ready?"READY":"MISSING"}</div>
-              <div style={{fontWeight:700,marginTop:4}}>{actionLabel[x.type]??x.type}</div>
-            </div>)}
+            {readiness.map(x=>{
+              const phaseActions=c.actions.filter(a=>a.actionType===x.type);
+              const targets=[...new Set(phaseActions.map(a=>a.executionTarget).filter(Boolean))] as string[];
+              return <div key={x.type} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:12,background:x.ready?"#f0fdf4":"#fff7ed"}}>
+                <div style={{fontSize:12,fontWeight:800,color:x.ready?"#166534":"#9a3412"}}>{x.ready?"READY":"MISSING"}</div>
+                <div style={{fontWeight:700,marginTop:4}}>{actionLabel[x.type]??x.type}</div>
+                {targets.length>0&&<div style={{fontSize:12,color:"#6b7280",marginTop:5}}>{targets.length} channel/opportunity target{targets.length===1?"":"s"}</div>}
+              </div>
+            })}
           </div>
 
           <details>
-            <summary style={{cursor:"pointer",fontWeight:800}}>Show generated execution tasks ({actions.length})</summary>
-            <div style={{display:"grid",gap:8,marginTop:12}}>{actions.map((a,i)=><div key={a.id||`${a.actionType}:${i}`} style={{borderLeft:"3px solid #d1d5db",padding:"7px 10px"}}><strong>{actionLabel[a.actionType]??a.actionType}</strong><div style={{fontSize:13,color:"#4b5563",marginTop:3}}>{a.description}</div>{a.executionTarget&&<div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Target: {a.executionTarget}</div>}</div>)}</div>
+            <summary style={{cursor:"pointer",fontWeight:800}}>Show execution detail</summary>
+            <div style={{display:"grid",gap:10,marginTop:12}}>{phaseOrder.map(type=>{
+              const phaseActions=c.actions.filter(a=>a.actionType===type);
+              const targets=[...new Set(phaseActions.map(a=>a.executionTarget).filter(Boolean))] as string[];
+              return <div key={type} style={{border:"1px solid #e5e7eb",borderRadius:10,padding:"10px 12px"}}>
+                <strong>{actionLabel[type]}</strong>
+                {targets.length>0?<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:7}}>{targets.map(t=><span key={t} style={{fontSize:12,padding:"4px 7px",background:"#f3f4f6",borderRadius:999}}>{t}</span>)}</div>:<div style={{fontSize:13,color:"#9a3412",marginTop:5}}>Not yet generated.</div>}
+              </div>
+            })}</div>
           </details>
         </article>
       })}
