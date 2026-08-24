@@ -4,6 +4,7 @@ import PromotionalAssetsGlobalNav from "@/components/PromotionalAssetsGlobalNav"
 import PromotionalAssetsNavInjector from "@/components/PromotionalAssetsNavInjector";
 import CampaignCollectionPromoteFeedback from "@/components/CampaignCollectionPromoteFeedback";
 import CampaignWooCommerceDefaults from "@/components/CampaignWooCommerceDefaults";
+import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -14,5 +15,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/>{children}</body></html>;
 }
