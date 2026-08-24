@@ -33,6 +33,33 @@ export default function CampaignVisualProductionBridge(){
     const img=document.createElement("img");img.src=url;img.alt=label;img.dataset.lmgGenerated="1";img.style.width="100%";img.style.height="auto";img.style.borderRadius="12px";preview.appendChild(img);
   };
 
+  const enhanceStep5A=()=>{
+    const headings=Array.from(document.querySelectorAll<HTMLElement>(".stage-heading"));
+    const heading=headings.find(h=>h.textContent?.includes("Campaign Visual Library"));
+    const section=heading?.closest<HTMLElement>(".campaign-stage-panel");
+    if(!section)return;
+    const button=Array.from(section.querySelectorAll<HTMLButtonElement>("button")).find(b=>/Campaign Visual Library/i.test(b.textContent??""));
+    if(!button)return;
+
+    const checkedProducts=Array.from(document.querySelectorAll<HTMLInputElement>(".campaign-table tbody input[type='checkbox']:checked"));
+    let blocker=section.querySelector<HTMLElement>("[data-lmg-visual-gate='1']");
+
+    if(checkedProducts.length>0){
+      if(button.disabled)button.disabled=false;
+      button.removeAttribute("title");
+      blocker?.remove();
+    }else{
+      if(!blocker){
+        blocker=document.createElement("p");
+        blocker.dataset.lmgVisualGate="1";
+        blocker.className="gate-blocker";
+        button.insertAdjacentElement("afterend",blocker);
+      }
+      blocker.textContent="Select at least one product in Step 2 to activate the Campaign Visual Library. Messaging approval does not control Step 5A.";
+      button.title="Select at least one product in Step 2";
+    }
+  };
+
   const enhanceGeneratorButtons=()=>{
     for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>("button"))){
       if(button.textContent?.trim()!=="Generate Lifestyle Image"||button.dataset.lmgVisualGenerator==="1")continue;
@@ -67,10 +94,11 @@ export default function CampaignVisualProductionBridge(){
     }
   };
 
-  const enhance=()=>{enhanceGeneratorButtons();enhanceStep7();};
+  const enhance=()=>{enhanceStep5A();enhanceGeneratorButtons();enhanceStep7();};
   enhance();
-  const observer=new MutationObserver(()=>enhance());observer.observe(document.body,{childList:true,subtree:true});
-  return()=>observer.disconnect();
+  const observer=new MutationObserver(()=>enhance());observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["checked","disabled"]});
+  document.addEventListener("change",enhance,true);
+  return()=>{observer.disconnect();document.removeEventListener("change",enhance,true);};
  },[]);
  return null;
 }
