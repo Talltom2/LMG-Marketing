@@ -27,17 +27,29 @@ export default function CampaignVisualProductionBridge(){
   const findCopyInput=(card:HTMLElement,label:string)=>Array.from(card.querySelectorAll<HTMLInputElement>(".creative-copy-edit input")).find(i=>i.closest("label")?.textContent?.trim().startsWith(label));
   const ensureLivePreview=(card:HTMLElement)=>{const imagePreview=Array.from(card.querySelectorAll<HTMLElement>(".creative-preview")).find(p=>!!p.querySelector("img"));if(!imagePreview)return;imagePreview.classList.add("lmg-live-creative-preview");let overlay=imagePreview.querySelector<HTMLElement>("[data-lmg-preview-overlay='1']");if(!overlay){overlay=document.createElement("div");overlay.dataset.lmgPreviewOverlay="1";overlay.className="lmg-preview-overlay";overlay.innerHTML='<div class="lmg-preview-copy"><strong data-lmg-preview-headline></strong><span data-lmg-preview-body></span><b data-lmg-preview-cta></b></div>';imagePreview.appendChild(overlay);}const channel=card.querySelector(".eyebrow")?.textContent?.trim()??"";const headline=findCopyInput(card,"Headline")?.value??"";const cta=findCopyInput(card,"CTA")?.value??"";const body=card.querySelector<HTMLTextAreaElement>(".creative-copy-edit textarea")?.value??"";const pinOverlay=card.querySelector<HTMLInputElement>("[data-pin-overlay]")?.value?.trim();const h=overlay.querySelector<HTMLElement>("[data-lmg-preview-headline]");const b=overlay.querySelector<HTMLElement>("[data-lmg-preview-body]");const c=overlay.querySelector<HTMLElement>("[data-lmg-preview-cta]");setText(h,channel==="Pinterest"&&pinOverlay?pinOverlay:headline);setText(b,channel==="Pinterest"?"":body);if(b)b.style.display=channel==="Pinterest"?"none":"-webkit-box";setText(c,cta);imagePreview.dataset.lmgPreviewChannel=channel;};
 
-  const enhanceStep7=()=>{const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;for(const card of Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"))){enhancePinterestCard(card);const select=card.querySelector<HTMLSelectElement>("select");if(select){const apply=()=>{const option=select.options[select.selectedIndex];if(!option)return;const label=labelFromOption(option.textContent??"");if(memory[label])renderGenerated(card,label);ensureLivePreview(card);};apply();if(select.dataset.lmgVisualSelect!=="1"){select.dataset.lmgVisualSelect="1";select.addEventListener("change",apply);}}ensureLivePreview(card);if(card.dataset.lmgPreviewEvents!=="1"){card.dataset.lmgPreviewEvents="1";card.addEventListener("input",()=>ensureLivePreview(card));}}};
+  const enhanceStep7=()=>{const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return false;for(const card of Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"))){enhancePinterestCard(card);const select=card.querySelector<HTMLSelectElement>("select");if(select){const apply=()=>{const option=select.options[select.selectedIndex];if(!option)return;const label=labelFromOption(option.textContent??"");if(memory[label])renderGenerated(card,label);ensureLivePreview(card);};apply();if(select.dataset.lmgVisualSelect!=="1"){select.dataset.lmgVisualSelect="1";select.addEventListener("change",apply);}}ensureLivePreview(card);if(card.dataset.lmgPreviewEvents!=="1"){card.dataset.lmgPreviewEvents="1";card.addEventListener("input",()=>ensureLivePreview(card));}}return true;};
 
-  let scheduled=false;
-  const enhance=()=>{scheduled=false;enhanceStep5A();enhanceGeneratorButtons();enhanceStep7();};
-  const scheduleEnhance=()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(enhance);};
-  scheduleEnhance();
-  const onInteraction=()=>scheduleEnhance();
+  const enhanceBase=()=>{enhanceStep5A();enhanceGeneratorButtons();enhanceStep7();};
+  requestAnimationFrame(enhanceBase);
+
+  // Step 7 is inserted by React only after campaign-plan approval. Watch only until it appears,
+  // then disconnect immediately so preview DOM updates cannot create a recursive observer loop.
+  let step7Observer:MutationObserver|null=null;
+  if(!document.querySelector("#creative-approval")){
+    step7Observer=new MutationObserver(()=>{
+      if(!document.querySelector("#creative-approval"))return;
+      step7Observer?.disconnect();
+      step7Observer=null;
+      requestAnimationFrame(()=>{enhanceGeneratorButtons();enhanceStep7();});
+    });
+    const root=document.querySelector("main")??document.body;
+    step7Observer.observe(root,{childList:true,subtree:true});
+  }
+
+  const onInteraction=()=>requestAnimationFrame(enhanceBase);
   document.addEventListener("change",onInteraction,true);
   document.addEventListener("click",onInteraction,true);
-  const delayed=window.setTimeout(scheduleEnhance,750);
-  return()=>{document.removeEventListener("change",onInteraction,true);document.removeEventListener("click",onInteraction,true);window.clearTimeout(delayed);};
+  return()=>{step7Observer?.disconnect();document.removeEventListener("change",onInteraction,true);document.removeEventListener("click",onInteraction,true);};
  },[]);
  return null;
 }
