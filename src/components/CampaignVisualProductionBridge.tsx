@@ -33,11 +33,28 @@ export default function CampaignVisualProductionBridge(){
     anchor.insertAdjacentElement("afterend",panel);
     const overlay=panel.querySelector<HTMLInputElement>("[data-pin-overlay]");const title=panel.querySelector<HTMLInputElement>("[data-pin-title]");const desc=panel.querySelector<HTMLTextAreaElement>("[data-pin-description]");
     if(overlay)overlay.value=headlineInput?.value??"";if(title)title.value=headlineInput?.value??"";if(desc)desc.value=body?.value??"";
-    const markReview=()=>{const status=card.querySelector<HTMLElement>(".creative-version");if(status&&status.textContent?.includes("APPROVED"))status.textContent=status.textContent.replace("APPROVED","REVIEW");};
-    panel.addEventListener("input",markReview);
   };
 
-  const enhanceStep7=()=>{const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;for(const card of Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"))){enhancePinterestCard(card);const select=card.querySelector<HTMLSelectElement>("select");if(!select)continue;const apply=()=>{const option=select.options[select.selectedIndex];if(!option)return;const label=labelFromOption(option.textContent??"");if(memory[label])renderGenerated(card,label);};apply();if(select.dataset.lmgVisualSelect!=="1"){select.dataset.lmgVisualSelect="1";select.addEventListener("change",()=>setTimeout(apply,0));}}};
+  const findCopyInput=(card:HTMLElement,label:string)=>Array.from(card.querySelectorAll<HTMLInputElement>(".creative-copy-edit input")).find(i=>i.closest("label")?.textContent?.trim().startsWith(label));
+  const ensureLivePreview=(card:HTMLElement)=>{
+    const imagePreview=Array.from(card.querySelectorAll<HTMLElement>(".creative-preview")).find(p=>!!p.querySelector("img"));
+    if(!imagePreview)return;
+    imagePreview.classList.add("lmg-live-creative-preview");
+    let overlay=imagePreview.querySelector<HTMLElement>("[data-lmg-preview-overlay='1']");
+    if(!overlay){overlay=document.createElement("div");overlay.dataset.lmgPreviewOverlay="1";overlay.className="lmg-preview-overlay";overlay.innerHTML='<div class="lmg-preview-copy"><strong data-lmg-preview-headline></strong><span data-lmg-preview-body></span><b data-lmg-preview-cta></b></div>';imagePreview.appendChild(overlay);}
+    const channel=card.querySelector(".eyebrow")?.textContent?.trim()??"";
+    const headline=findCopyInput(card,"Headline")?.value??"";
+    const cta=findCopyInput(card,"CTA")?.value??"";
+    const body=card.querySelector<HTMLTextAreaElement>(".creative-copy-edit textarea")?.value??"";
+    const pinOverlay=card.querySelector<HTMLInputElement>("[data-pin-overlay]")?.value?.trim();
+    const h=overlay.querySelector<HTMLElement>("[data-lmg-preview-headline]");const b=overlay.querySelector<HTMLElement>("[data-lmg-preview-body]");const c=overlay.querySelector<HTMLElement>("[data-lmg-preview-cta]");
+    if(h)h.textContent=channel==="Pinterest"&&pinOverlay?pinOverlay:headline;
+    if(b){b.textContent=channel==="Pinterest"?"":body;b.style.display=channel==="Pinterest"?"none":"-webkit-box";}
+    if(c)c.textContent=cta;
+    imagePreview.dataset.lmgPreviewChannel=channel;
+  };
+
+  const enhanceStep7=()=>{const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;for(const card of Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"))){enhancePinterestCard(card);const select=card.querySelector<HTMLSelectElement>("select");if(select){const apply=()=>{const option=select.options[select.selectedIndex];if(!option)return;const label=labelFromOption(option.textContent??"");if(memory[label])renderGenerated(card,label);setTimeout(()=>ensureLivePreview(card),0);};apply();if(select.dataset.lmgVisualSelect!=="1"){select.dataset.lmgVisualSelect="1";select.addEventListener("change",()=>setTimeout(apply,0));}}ensureLivePreview(card);if(card.dataset.lmgPreviewEvents!=="1"){card.dataset.lmgPreviewEvents="1";card.addEventListener("input",()=>ensureLivePreview(card));}}};
 
   const enhance=()=>{enhanceStep5A();enhanceGeneratorButtons();enhanceStep7();};enhance();const observer=new MutationObserver(()=>enhance());observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["checked","disabled"]});document.addEventListener("change",enhance,true);return()=>{observer.disconnect();document.removeEventListener("change",enhance,true);};
  },[]);
