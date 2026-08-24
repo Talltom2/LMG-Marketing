@@ -103,9 +103,9 @@ export async function POST(request: NextRequest) {
       where: {
         name,
         startDate,
-        endDate,
         status: { in: [CampaignStatus.DRAFT, CampaignStatus.PLANNED] },
       },
+      orderBy: { createdAt: "desc" },
       include: { products: true },
     });
     const reusableCampaign = reusableCandidates.find((candidate) => sameIds(candidate.products.map((row) => row.productId), productIds));
@@ -116,6 +116,8 @@ export async function POST(request: NextRequest) {
             where: { id: reusableCampaign.id },
             data: {
               objective: objective || null,
+              startDate,
+              endDate,
               status: CampaignStatus.PLANNED,
               channelId: validTypes.length === 1 ? channelByType.get(validTypes[0])?.id ?? null : null,
             },
