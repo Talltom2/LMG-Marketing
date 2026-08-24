@@ -11,6 +11,7 @@ import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityAp
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
+import "./opportunity-flags.css";
 
 export const metadata:Metadata={
   title:"LMG Marketing Intelligence",
