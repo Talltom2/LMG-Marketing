@@ -24,11 +24,20 @@ export default function CampaignOpportunityApprovalGuard(){
       const paid=!!budget;
       const hasBudget=!paid||Number(budget?.value||0)>0;
 
-      // The visible selector is the user's source of truth. If it contains a visual and
-      // any required paid budget is present, do not leave the individual approval control disabled.
       if(approvalButton&&status.includes("REVIEW")&&hasVisual&&hasBudget){
         approvalButton.disabled=false;
         approvalButton.title="Approve this opportunity only";
+      }
+
+      const channel=card.querySelector(".eyebrow")?.textContent?.trim()??"";
+      const opportunity=card.querySelector("h3")?.textContent?.trim()??"";
+      if(channel==="Website Homepage"&&/Homepage Hero Feature/i.test(opportunity)&&!card.querySelector("[data-lmg-hero-spec='1']")){
+        const format=card.querySelector<HTMLElement>(".creative-spec");
+        const spec=document.createElement("p");
+        spec.dataset.lmgHeroSpec="1";
+        spec.className="creative-spec lmg-hero-production-spec";
+        spec.innerHTML="<strong>LMG hero working master:</strong> 1920 × 800 px desktop canvas (2.4:1), responsive cover. Keep the product, headline and CTA inside the center-safe area because Kadence will crop differently on tablet and mobile.";
+        format?.insertAdjacentElement("afterend",spec);
       }
 
       const head=card.querySelector<HTMLElement>(".creative-card-head");
