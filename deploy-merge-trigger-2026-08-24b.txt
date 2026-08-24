@@ -1,0 +1,1 @@
+Force Vercel production deployment through a pull-request merge event.
