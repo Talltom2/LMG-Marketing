@@ -8,8 +8,8 @@ export const opportunityCatalog:Record<string,PromotionalOpportunity[]>={
     {id:"supporting-module",label:"Supporting Homepage Module",description:"Secondary merchandising block that reinforces the campaign below the hero.",audience:"Homepage visitors",timingOffsetDays:0,recommendedFor:["COLLECTION_THEME","SEASONAL","EVERGREEN_SPOTLIGHT"]}
   ],
   WOOCOMMERCE:[
-    {id:"landing-page",label:"Campaign Landing Page",description:"Dedicated campaign destination for the selected products and message.",audience:"Campaign traffic",timingOffsetDays:0,recommendedFor:["PRODUCT_LAUNCH","SEASONAL","PROMOTIONAL_EVENT","COLLECTION_THEME"]},
-    {id:"collection-merchandising",label:"Collection Merchandising",description:"Feature and reorder selected products in relevant store/category views.",audience:"Store browsers",timingOffsetDays:0,recommendedFor:["COLLECTION_THEME","SEASONAL","INVENTORY_CLEARANCE"]},
+    {id:"landing-page",label:"Dedicated Campaign Landing Page",description:"Dedicated campaign story page with opportunity-specific lifestyle imagery, campaign messaging, featured products and calls to action.",audience:"Campaign traffic",timingOffsetDays:0,recommendedFor:["PRODUCT_LAUNCH","SEASONAL","PROMOTIONAL_EVENT","COLLECTION_THEME","EVERGREEN_SPOTLIGHT"]},
+    {id:"collection-page",label:"Campaign Collection Page",description:"Shoppable campaign collection page with its own product-forward lifestyle banner, campaign copy and selected product grid.",audience:"High-intent campaign shoppers",timingOffsetDays:0,recommendedFor:["COLLECTION_THEME","SEASONAL","INVENTORY_CLEARANCE","EVERGREEN_SPOTLIGHT"]},
     {id:"onsite-offer",label:"On-site Offer",description:"Present campaign-specific offer messaging in the store experience.",audience:"High-intent website visitors",timingOffsetDays:0,recommendedFor:["PROMOTIONAL_EVENT","INVENTORY_CLEARANCE","REENGAGEMENT"]}
   ],
   PINTEREST:[
