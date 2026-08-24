@@ -10,6 +10,7 @@ import CampaignVisualProductionBridge from "@/components/CampaignVisualProductio
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
+import CampaignExecutionReadyLink from "@/components/CampaignExecutionReadyLink";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -23,5 +24,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
