@@ -1,4 +1,4 @@
-import { ChannelType, RecommendationStatus } from "@prisma/client";
+import { CampaignStatus, ChannelType, RecommendationStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getWebsiteProductHealth } from "@/lib/integrations/woocommerce/product-health";
@@ -26,6 +26,13 @@ function creativeFor(channel: string, names: string[], objective?: string) {
   const hero = names.slice(0, 3).join(", ");
   const goal = objective || "drive qualified traffic and profitable sales";
   return `Feature ${hero}. Message: warm, useful country-home inspiration with a clear reason to shop now. Goal: ${goal}. Adapt headline, body copy and CTA to ${channel}.`;
+}
+
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((value, index) => value === right[index]);
 }
 
 export async function GET() {
@@ -90,21 +97,46 @@ export async function POST(request: NextRequest) {
     const validTypes = requestedChannels.filter((value: string): value is ChannelType => Object.values(ChannelType).includes(value as ChannelType));
     const channels = await db.channel.findMany({ where: { type: { in: validTypes }, active: true } });
     const channelByType = new Map(channels.map((channel) => [channel.type, channel]));
+    const productIds = products.map((product) => product.id);
+
+    const reusableCandidates = await db.campaign.findMany({
+      where: {
+        name,
+        startDate,
+        endDate,
+        status: { in: [CampaignStatus.DRAFT, CampaignStatus.PLANNED] },
+      },
+      include: { products: true },
+    });
+    const reusableCampaign = reusableCandidates.find((candidate) => sameIds(candidate.products.map((row) => row.productId), productIds));
 
     const result = await db.$transaction(async (tx) => {
-      const campaign = await tx.campaign.create({
-        data: {
-          name,
-          objective: objective || null,
-          startDate,
-          endDate,
-          status: "PLANNED",
-          channelId: validTypes.length === 1 ? channelByType.get(validTypes[0])?.id ?? null : null,
-          products: {
-            create: products.map((product, index) => ({ productId: product.id, role: index === 0 ? "HERO" : "SUPPORT" })),
-          },
-        },
-      });
+      const campaign = reusableCampaign
+        ? await tx.campaign.update({
+            where: { id: reusableCampaign.id },
+            data: {
+              objective: objective || null,
+              status: CampaignStatus.PLANNED,
+              channelId: validTypes.length === 1 ? channelByType.get(validTypes[0])?.id ?? null : null,
+            },
+          })
+        : await tx.campaign.create({
+            data: {
+              name,
+              objective: objective || null,
+              startDate,
+              endDate,
+              status: CampaignStatus.PLANNED,
+              channelId: validTypes.length === 1 ? channelByType.get(validTypes[0])?.id ?? null : null,
+              products: {
+                create: products.map((product, index) => ({ productId: product.id, role: index === 0 ? "HERO" : "SUPPORT" })),
+              },
+            },
+          });
+
+      if (reusableCampaign) {
+        await tx.recommendation.deleteMany({ where: { campaignId: campaign.id } });
+      }
 
       for (const type of validTypes) {
         const recommendedDate = addDays(startDate, channelOffsets[type] ?? -2);
@@ -139,7 +171,7 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({ campaign: result }, { status: 201 });
+    return NextResponse.json({ campaign: result, reusedExistingInstance: Boolean(reusableCampaign) }, { status: reusableCampaign ? 200 : 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to create campaign" }, { status: 500 });
   }
