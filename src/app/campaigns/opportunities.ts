@@ -1,11 +1,5 @@
 export type PromotionalOpportunity={
-  id:string;
-  label:string;
-  description:string;
-  audience:string;
-  timingOffsetDays:number;
-  paid?:boolean;
-  recommendedFor?:string[];
+  id:string;label:string;description:string;audience:string;timingOffsetDays:number;paid?:boolean;recommendedFor?:string[];
 };
 
 export const opportunityCatalog:Record<string,PromotionalOpportunity[]>={
@@ -19,11 +13,11 @@ export const opportunityCatalog:Record<string,PromotionalOpportunity[]>={
     {id:"onsite-offer",label:"On-site Offer",description:"Present campaign-specific offer messaging in the store experience.",audience:"High-intent website visitors",timingOffsetDays:0,recommendedFor:["PROMOTIONAL_EVENT","INVENTORY_CLEARANCE","REENGAGEMENT"]}
   ],
   PINTEREST:[
-    {id:"organic-product-pins",label:"Organic Product Pins",description:"Publish shoppable product-focused Pins tied to campaign products.",audience:"Pinterest discovery traffic",timingOffsetDays:-7,recommendedFor:["PRODUCT_LAUNCH","EVERGREEN_SPOTLIGHT","SEASONAL"]},
-    {id:"seasonal-board",label:"Seasonal / Theme Board Push",description:"Build or refresh a board around the campaign theme and distribute multiple related Pins.",audience:"Theme and seasonal browsers",timingOffsetDays:-14,recommendedFor:["SEASONAL","COLLECTION_THEME"]},
-    {id:"inspiration-content",label:"Inspirational / Lifestyle Pins",description:"Use lifestyle or idea-led creative to create demand before the direct product pitch.",audience:"Upper-funnel inspiration seekers",timingOffsetDays:-10,recommendedFor:["SEASONAL","COLLECTION_THEME","PRODUCT_LAUNCH"]},
-    {id:"paid-pinterest",label:"Paid Pinterest Campaign",description:"Promote selected campaign Pins with paid targeting and budget control.",audience:"Targeted prospecting or retargeting audience",timingOffsetDays:-7,paid:true,recommendedFor:["PRODUCT_LAUNCH","SEASONAL","PROMOTIONAL_EVENT","EVERGREEN_SPOTLIGHT"]},
-    {id:"retargeting",label:"Pinterest Retargeting",description:"Re-engage people who previously visited or interacted with campaign content.",audience:"Warm visitors and engagers",timingOffsetDays:-2,paid:true,recommendedFor:["REENGAGEMENT","PROMOTIONAL_EVENT"]}
+    {id:"organic-product-pins",label:"Organic Product Pins",description:"Create finished 2:3 shoppable Pins with approved product/lifestyle imagery, optional on-image copy, Pin title and discovery description.",audience:"Pinterest discovery traffic",timingOffsetDays:-7,recommendedFor:["PRODUCT_LAUNCH","EVERGREEN_SPOTLIGHT","SEASONAL"]},
+    {id:"seasonal-board",label:"Seasonal / Theme Board Push",description:"Build or refresh a campaign board and distribute multiple 2:3 Pins with coordinated visual copy, titles and descriptions.",audience:"Theme and seasonal browsers",timingOffsetDays:-14,recommendedFor:["SEASONAL","COLLECTION_THEME"]},
+    {id:"inspiration-content",label:"Inspirational / Lifestyle Pins",description:"Create 2:3 lifestyle Pins using approved campaign imagery, concise image-overlay copy, a Pin title and discovery-focused description.",audience:"Upper-funnel inspiration seekers",timingOffsetDays:-10,recommendedFor:["SEASONAL","COLLECTION_THEME","PRODUCT_LAUNCH"]},
+    {id:"paid-pinterest",label:"Paid Pinterest Campaign",description:"Adapt approved campaign Pins for paid distribution with final visual copy, Pin title, description, targeting and budget control.",audience:"Targeted prospecting or retargeting audience",timingOffsetDays:-7,paid:true,recommendedFor:["PRODUCT_LAUNCH","SEASONAL","PROMOTIONAL_EVENT","EVERGREEN_SPOTLIGHT"]},
+    {id:"retargeting",label:"Pinterest Retargeting",description:"Re-engage prior visitors or engagers with campaign-consistent Pin imagery and Pinterest-specific copy.",audience:"Warm visitors and engagers",timingOffsetDays:-2,paid:true,recommendedFor:["REENGAGEMENT","PROMOTIONAL_EVENT"]}
   ],
   TIKTOK:[
     {id:"organic-video",label:"Organic Short-form Video",description:"Create an organic campaign video for awareness and discovery.",audience:"TikTok organic audience",timingOffsetDays:-5,recommendedFor:["PRODUCT_LAUNCH","SEASONAL","COLLECTION_THEME"]},
@@ -72,10 +66,5 @@ export const opportunityCatalog:Record<string,PromotionalOpportunity[]>={
   ]
 };
 
-export function recommendedOpportunityIdsFor(channel:string,templateId:string){
-  const options=opportunityCatalog[channel]??[];
-  const recommended=options.filter(o=>o.recommendedFor?.includes(templateId)).map(o=>o.id);
-  return recommended.length?recommended:[options[0]?.id].filter(Boolean) as string[];
-}
-
+export function recommendedOpportunityIdsFor(channel:string,templateId:string){const options=opportunityCatalog[channel]??[];const recommended=options.filter(o=>o.recommendedFor?.includes(templateId)).map(o=>o.id);return recommended.length?recommended:[options[0]?.id].filter(Boolean) as string[];}
 export function opportunityFor(channel:string,id:string){return (opportunityCatalog[channel]??[]).find(o=>o.id===id)}
