@@ -1,5 +1,6 @@
 import type {Metadata} from "next";
 import GlobalCampaignNav from "@/components/GlobalCampaignNav";
+import PromotionalAssetsGlobalNav from "@/components/PromotionalAssetsGlobalNav";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -10,5 +11,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/>{children}</body></html>;
 }
