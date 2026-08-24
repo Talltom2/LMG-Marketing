@@ -17,6 +17,7 @@ import "./nav-bridge.css";
 import "./opportunity-flags.css";
 import "./visual-card-collapse.css";
 import "./schedule-preflight.css";
+import "./dashboard-restore.css";
 
 export const metadata:Metadata={
   title:"LMG Marketing Intelligence",
