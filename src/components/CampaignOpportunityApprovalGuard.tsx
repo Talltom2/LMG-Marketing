@@ -3,16 +3,18 @@
 import {useEffect} from "react";
 
 const SCHEDULED_KEY="lmg-campaign-scheduled-opportunities-v1";
+const INSTANCE_KEY="lmg-campaign-instance-v1";
 type ScheduleMap=Record<string,{queuedAt:string;channel:string;opportunity:string}>;
 
 function readScheduled():ScheduleMap{try{return JSON.parse(localStorage.getItem(SCHEDULED_KEY)??"{}") as ScheduleMap;}catch{return{};}}
+function campaignInstance(){try{let id=sessionStorage.getItem(INSTANCE_KEY);if(!id){id=typeof crypto!=="undefined"&&"randomUUID" in crypto?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;sessionStorage.setItem(INSTANCE_KEY,id);}return id;}catch{return"session";}}
 
 export default function CampaignOpportunityApprovalGuard(){
   useEffect(()=>{
     if(location.pathname!=="/campaigns")return;
 
-    const campaignName=()=>document.querySelector<HTMLElement>(".campaign-name-title")?.textContent?.trim()||"campaign";
-    const opportunityKey=(card:HTMLElement)=>`${campaignName()}::${card.querySelector(".eyebrow")?.textContent?.trim()??""}::${card.querySelector("h3")?.textContent?.trim()??""}`;
+    campaignInstance();
+    const opportunityKey=(card:HTMLElement)=>`${campaignInstance()}::${card.querySelector(".eyebrow")?.textContent?.trim()??""}::${card.querySelector("h3")?.textContent?.trim()??""}`;
 
     const enhanceCard=(card:HTMLElement)=>{
       const version=card.querySelector<HTMLElement>(".creative-version");
