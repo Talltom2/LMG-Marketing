@@ -1,10 +1,12 @@
-import {NextResponse} from "next/server";
+import {NextRequest,NextResponse} from "next/server";
+import {db} from "@/lib/db";
 
 export const dynamic="force-dynamic";
 
 type ConnectionField={key:string;label:string;secret?:boolean};
 type AssetConnection={asset:string;label:string;fields:ConnectionField[]};
 
+const LIBRARY_KEY="default";
 const connections:AssetConnection[]=[
   {asset:"WEBSITE_HOMEPAGE",label:"Website Homepage",fields:[{key:"WOOCOMMERCE_URL",label:"Website URL"}]},
   {asset:"WOOCOMMERCE",label:"WooCommerce Store",fields:[{key:"WOOCOMMERCE_URL",label:"Store URL"},{key:"WOOCOMMERCE_CONSUMER_KEY",label:"Consumer Key",secret:true},{key:"WOOCOMMERCE_CONSUMER_SECRET",label:"Consumer Secret",secret:true}]},
@@ -25,10 +27,38 @@ function fieldStatus(field:ConnectionField){
   return {key:field.key,label:field.label,secret:!!field.secret,configured:!!value,display:field.secret?(value?"•••••••• configured":"Not configured"):(value||"Not configured")};
 }
 
+async function readLibrary(){
+  const rows=await db.$queryRawUnsafe<Array<{data:unknown;updatedAt:Date}>>(
+    `SELECT "data", "updatedAt" FROM "PromotionalAssetLibrary" WHERE "key"=$1 LIMIT 1`,LIBRARY_KEY
+  );
+  return rows[0]??null;
+}
+
 export async function GET(){
-  const assets=connections.map(connection=>{
-    const fields=connection.fields.map(fieldStatus);
-    return {...connection,fields,configured:fields.length>0&&fields.every(f=>f.configured),partial:fields.some(f=>f.configured)&&!fields.every(f=>f.configured)};
-  });
-  return NextResponse.json({assets,securityNote:"Secret values are never returned by this endpoint. Replace secrets in deployment environment settings."});
+  try{
+    const [stored]=await Promise.all([readLibrary()]);
+    const assets=connections.map(connection=>{
+      const fields=connection.fields.map(fieldStatus);
+      return {...connection,fields,configured:fields.length>0&&fields.every(f=>f.configured),partial:fields.some(f=>f.configured)&&!fields.every(f=>f.configured)};
+    });
+    return NextResponse.json({assets,library:stored?.data??null,updatedAt:stored?.updatedAt??null,securityNote:"Secret values are never returned by this endpoint. Replace secrets in deployment environment settings."});
+  }catch(error){
+    return NextResponse.json({error:error instanceof Error?error.message:"Unable to load promotional asset library."},{status:500});
+  }
+}
+
+export async function PUT(request:NextRequest){
+  try{
+    const body=await request.json() as {library?:unknown};
+    if(!body.library||typeof body.library!=="object")return NextResponse.json({error:"A promotional asset library object is required."},{status:400});
+    const json=JSON.stringify(body.library);
+    await db.$executeRawUnsafe(
+      `INSERT INTO "PromotionalAssetLibrary" ("key","data","updatedAt") VALUES ($1,$2::jsonb,now()) ON CONFLICT ("key") DO UPDATE SET "data"=EXCLUDED."data", "updatedAt"=now()`,
+      LIBRARY_KEY,json
+    );
+    const stored=await readLibrary();
+    return NextResponse.json({ok:true,updatedAt:stored?.updatedAt??new Date()});
+  }catch(error){
+    return NextResponse.json({error:error instanceof Error?error.message:"Unable to save promotional asset library."},{status:500});
+  }
 }
