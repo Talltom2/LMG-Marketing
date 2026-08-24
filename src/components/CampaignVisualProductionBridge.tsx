@@ -4,6 +4,7 @@ import {useEffect} from "react";
 
 const STORAGE_KEY="lmg-campaign-generated-visuals-v1";
 const SCHEDULED_KEY="lmg-campaign-scheduled-opportunities-v1";
+const INSTANCE_KEY="lmg-campaign-instance-v1";
 type VisualMap=Record<string,string>;
 type ScheduleMap=Record<string,{queuedAt:string;channel:string;opportunity:string}>;
 
@@ -11,6 +12,9 @@ function readStored():VisualMap{try{return JSON.parse(sessionStorage.getItem(STO
 function writeStored(value:VisualMap){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(value));}catch{}}
 function readScheduled():ScheduleMap{try{return JSON.parse(localStorage.getItem(SCHEDULED_KEY)??"{}") as ScheduleMap;}catch{return{};}}
 function writeScheduled(value:ScheduleMap){try{localStorage.setItem(SCHEDULED_KEY,JSON.stringify(value));}catch{}}
+function newInstanceId(){return typeof crypto!=="undefined"&&"randomUUID" in crypto?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+function campaignInstance(){try{let id=sessionStorage.getItem(INSTANCE_KEY);if(!id){id=newInstanceId();sessionStorage.setItem(INSTANCE_KEY,id);}return id;}catch{return"session";}}
+function renewCampaignInstance(){try{const id=newInstanceId();sessionStorage.setItem(INSTANCE_KEY,id);return id;}catch{return"session";}}
 function labelFromOption(text:string){return text.replace(/\s·\s(?:SOURCE|RECOMMENDED|APPROVED)$/i,"").trim();}
 function setText(el:HTMLElement|null,value:string){if(el&&el.textContent!==value)el.textContent=value;}
 
@@ -18,6 +22,7 @@ export default function CampaignVisualProductionBridge(){
  useEffect(()=>{
   if(location.pathname!=="/campaigns")return;
   const memory:VisualMap=readStored();
+  campaignInstance();
 
   const sourceFor=(label:string)=>{const product=label.replace(/\s·\sAI lifestyle concept$/i,"").trim();for(const card of Array.from(document.querySelectorAll<HTMLElement>("article.creative-card"))){const title=card.querySelector("h3")?.textContent?.trim()??"";if(title===`${product} · primary product image`){const img=card.querySelector<HTMLImageElement>("img");if(img?.src)return img.src;}}return "";};
   const renderGenerated=(card:HTMLElement,label:string)=>{const url=memory[label];if(!url)return;const preview=card.querySelector<HTMLElement>(".creative-preview");if(!preview)return;if(preview.querySelector("img[data-lmg-generated='1']"))return;preview.innerHTML="";const img=document.createElement("img");img.src=url;img.alt=label;img.dataset.lmgGenerated="1";img.style.width="100%";img.style.height="auto";img.style.borderRadius="12px";preview.appendChild(img);};
@@ -31,21 +36,21 @@ export default function CampaignVisualProductionBridge(){
   const findCopyInput=(card:HTMLElement,label:string)=>Array.from(card.querySelectorAll<HTMLInputElement>(".creative-copy-edit input")).find(i=>i.closest("label")?.textContent?.trim().startsWith(label));
   const ensureLivePreview=(card:HTMLElement)=>{const imagePreview=Array.from(card.querySelectorAll<HTMLElement>(".creative-preview")).find(p=>!!p.querySelector("img"));if(!imagePreview)return;imagePreview.classList.add("lmg-live-creative-preview");let overlay=imagePreview.querySelector<HTMLElement>("[data-lmg-preview-overlay='1']");if(!overlay){overlay=document.createElement("div");overlay.dataset.lmgPreviewOverlay="1";overlay.className="lmg-preview-overlay";overlay.innerHTML='<div class="lmg-preview-copy"><strong data-lmg-preview-headline></strong><span data-lmg-preview-body></span><b data-lmg-preview-cta></b></div>';imagePreview.appendChild(overlay);}const channel=card.querySelector(".eyebrow")?.textContent?.trim()??"";const headline=findCopyInput(card,"Headline")?.value??"";const cta=findCopyInput(card,"CTA")?.value??"";const body=card.querySelector<HTMLTextAreaElement>(".creative-copy-edit textarea")?.value??"";const pinOverlay=card.querySelector<HTMLInputElement>("[data-pin-overlay]")?.value?.trim();const h=overlay.querySelector<HTMLElement>("[data-lmg-preview-headline]");const b=overlay.querySelector<HTMLElement>("[data-lmg-preview-body]");const c=overlay.querySelector<HTMLElement>("[data-lmg-preview-cta]");setText(h,channel==="Pinterest"&&pinOverlay?pinOverlay:headline);setText(b,channel==="Pinterest"?"":body);if(b)b.style.display=channel==="Pinterest"?"none":"-webkit-box";setText(c,cta);imagePreview.dataset.lmgPreviewChannel=channel;};
 
-  const campaignName=()=>document.querySelector<HTMLElement>(".campaign-name-title")?.textContent?.trim()||"campaign";
-  const opportunityKey=(card:HTMLElement)=>`${campaignName()}::${card.querySelector(".eyebrow")?.textContent?.trim()??""}::${card.querySelector("h3")?.textContent?.trim()??""}`;
+  const opportunityKey=(card:HTMLElement)=>`${campaignInstance()}::${card.querySelector(".eyebrow")?.textContent?.trim()??""}::${card.querySelector("h3")?.textContent?.trim()??""}`;
   const isApproved=(card:HTMLElement)=>card.querySelector(".creative-version")?.textContent?.includes("APPROVED")??false;
   const renderStep8Queue=()=>{
     const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;
     const scheduled=readScheduled();
     let panel=document.querySelector<HTMLElement>("[data-lmg-step8='1']");
-    const entries=Object.entries(scheduled).filter(([key])=>key.startsWith(`${campaignName()}::`));
+    const prefix=`${campaignInstance()}::`;
+    const entries=Object.entries(scheduled).filter(([key])=>key.startsWith(prefix));
     if(!entries.length){panel?.remove();return;}
     if(!panel){panel=document.createElement("section");panel.dataset.lmgStep8="1";panel.className="campaign-stage-panel";section.insertAdjacentElement("afterend",panel);}
     panel.innerHTML=`<div class="stage-heading"><span>8</span><div><p class="eyebrow">Incremental scheduling queue</p><h2>Approved opportunities ready for scheduling</h2></div></div><p class="approval-note">Only newly approved opportunities are added. Previously queued opportunities are skipped automatically.</p><div class="calendar-list">${entries.map(([,item])=>`<p><strong>Queued</strong><span><b>${item.channel}</b> · ${item.opportunity}</span></p>`).join("")}</div>`;
   };
   const enhanceIncrementalScheduling=()=>{
     const section=document.querySelector<HTMLElement>("#creative-approval");if(!section)return;
-    const button=Array.from(section.querySelectorAll<HTMLButtonElement>("button")).find(b=>b.textContent?.includes("Continue to Step 8"));if(!button)return;
+    const button=Array.from(section.querySelectorAll<HTMLButtonElement>("button")).find(b=>b.textContent?.includes("Continue to Step 8")||b.textContent?.includes("Approved Opportunit")||b.textContent?.includes("No Newly Approved"));if(!button)return;
     const cards=Array.from(section.querySelectorAll<HTMLElement>("article.creative-card"));
     const scheduled=readScheduled();
     const eligible=cards.filter(card=>isApproved(card)&&!scheduled[opportunityKey(card)]);
@@ -81,7 +86,11 @@ export default function CampaignVisualProductionBridge(){
     step7Observer.observe(root,{childList:true,subtree:true});
   }
 
-  const onInteraction=()=>requestAnimationFrame(enhanceBase);
+  const onInteraction=(event:Event)=>{
+    const target=event.target as HTMLElement|null;
+    if(event.type==="click"&&target?.closest("button")?.textContent?.includes("Approve Campaign Plan & Create Opportunity Assets"))renewCampaignInstance();
+    requestAnimationFrame(enhanceBase);
+  };
   document.addEventListener("change",onInteraction,true);
   document.addEventListener("click",onInteraction,true);
   return()=>{step7Observer?.disconnect();document.removeEventListener("change",onInteraction,true);document.removeEventListener("click",onInteraction,true);};
