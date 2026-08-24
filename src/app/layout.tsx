@@ -7,6 +7,7 @@ import CampaignWooCommerceDefaults from "@/components/CampaignWooCommerceDefault
 import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
+import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -17,5 +18,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/>{children}</body></html>;
 }
