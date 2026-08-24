@@ -32,5 +32,5 @@ export async function GET(){
       contentRendered:page.body.content?.rendered||"",
     }:{error:page.body,status:page.status};
   }
-  return NextResponse.json({ok:true,user:{id:me.body.id,name:me.body.name,roles:me.body.roles,capabilities:me.body.capabilities},settings:settings.ok?{show_on_front:settings.body?.show_on_front,page_on_front:settings.body?.page_on_front,page_for_posts:settings.body?.page_for_posts}:null,homepage});
+  return NextResponse.json({ok:true,user:{id:me.body.id,name:me.body.name,roles:me.body.roles,capabilities:me.body.capabilities},settings:settings.ok?{show_on_front:settings.body?.show_on_front,page_on_front:settings.body?.page_on_front,page_for_posts:settings.body?.page_for_posts}:null,homepage,diagnosticVersion:2});
 }
