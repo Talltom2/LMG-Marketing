@@ -26,7 +26,7 @@ function setNativeValue(el:HTMLInputElement|HTMLTextAreaElement,value:string){
   el.dispatchEvent(new Event("change",{bubbles:true}));
 }
 
-function text(el:Element|null){return el?.textContent?.trim()??"";}
+function text(el:Element|null|undefined){return el?.textContent?.trim()??"";}
 
 export default function CampaignDraftPersistence(){
   useEffect(()=>{
@@ -35,7 +35,6 @@ export default function CampaignDraftPersistence(){
     let restoreAttempts=0;
 
     const getStep1=()=>document.querySelector<HTMLElement>(".campaign-details-card");
-    const getWorkspace=()=>document.querySelector<HTMLElement>(".campaign-workspace");
     const getChannels=()=>document.querySelector<HTMLElement>("#channels");
     const getMessaging=()=>Array.from(document.querySelectorAll<HTMLElement>(".campaign-stage-panel")).find(p=>text(p.querySelector("h2")).includes("Edit and approve the campaign messaging"));
 
@@ -45,7 +44,7 @@ export default function CampaignDraftPersistence(){
       const name=step1Inputs.find(i=>i.type!=="date");
       const dates=step1Inputs.filter(i=>i.type==="date");
       const objective=step1?.querySelector<HTMLTextAreaElement>("textarea");
-      const selectedTemplate=step1?.querySelector<HTMLButtonElement>(".template-card.selected strong");
+      const selectedTemplate=step1?.querySelector<HTMLElement>(".template-card.selected strong");
 
       const productSkus=Array.from(document.querySelectorAll<HTMLTableRowElement>(".campaign-table tbody tr"))
         .filter(r=>r.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked)
