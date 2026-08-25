@@ -5,222 +5,68 @@ import {usePathname} from "next/navigation";
 
 type Action={actionType?:string;description?:string;executionTarget?:string};
 type Recommendation={title?:string;recommendation?:string;actions?:Action[]};
-type Campaign={
-  id:string;
-  name:string;
-  objective?:string|null;
-  startDate:string;
-  endDate:string;
-  status:string;
-  products?:{product:{sku:string;name:string}}[];
-  recommendations?:Recommendation[];
-};
-
-type BuilderCopy={headline?:string;body?:string;cta?:string};
+type BuilderState={templateName?:string;productSkus?:string[];activeAssets?:string[];opportunities?:Record<string,string[]>;headline?:string;cta?:string;coreMessage?:string};
+type Campaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;theme?:string|null;products?:{product:{sku:string;name:string}}[];recommendations?:Recommendation[]};
+type Snapshot={name:string;startDate:string;endDate:string;objective:string;state:BuilderState};
 
 const OLD_DRAFT_KEY="lmg-marketing-campaign-builder-draft-v2";
+const ACTIVE_KEY="lmg-active-campaign-id";
+const STATE_PREFIX="LMG_BUILDER_STATE:";
 
-function setNativeValue(el:HTMLInputElement|HTMLTextAreaElement,value:string){
-  const proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
-  const setter=Object.getOwnPropertyDescriptor(proto,"value")?.set;
-  setter?.call(el,value);
-  el.dispatchEvent(new Event("input",{bubbles:true}));
-  el.dispatchEvent(new Event("change",{bubbles:true}));
-}
-
+function setNativeValue(el:HTMLInputElement|HTMLTextAreaElement,value:string){const proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(proto,"value")?.set;setter?.call(el,value);el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));}
 function text(el:Element|null|undefined){return el?.textContent?.trim()??"";}
 function campaignDate(value:string){return value?value.slice(0,10):"";}
 function incomplete(status:string){return !["COMPLETED","CLOSED","CANCELLED","CANCELED","STOPPED"].includes(status.toUpperCase());}
+function parseBuilderState(campaign:Campaign):BuilderState{if(!campaign.theme?.startsWith(STATE_PREFIX))return{};try{return JSON.parse(campaign.theme.slice(STATE_PREFIX.length)) as BuilderState}catch{return{}}}
+function localIso(d:Date){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
+function addDays(d:Date,n:number){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function daysInclusive(start:string,end:string){if(!start||!end)return 15;const a=new Date(`${start}T12:00:00`),b=new Date(`${end}T12:00:00`);const n=Math.round((b.getTime()-a.getTime())/86400000)+1;return Number.isFinite(n)&&n>0?Math.min(Math.max(n,1),60):15}
+function rangesOverlap(a1:Date,a2:Date,b1:Date,b2:Date){return a1<=b2&&b1<=a2}
 
-const assetAliases:[RegExp,string][]=[
-  [/website homepage/i,"Website Homepage"],
-  [/woocommerce/i,"WooCommerce Store"],
-  [/pinterest/i,"Pinterest"],
-  [/tiktok/i,"TikTok"],
-  [/facebook|instagram|meta/i,"Facebook / Instagram"],
-  [/bing|microsoft/i,"Bing / Microsoft Ads"],
-  [/walmart connect|walmart ads/i,"Walmart Connect Ads"],
-  [/walmart/i,"Walmart Marketplace"],
-  [/amazon canada|amazon ca/i,"Amazon Canada Marketplace"],
-  [/amazon ads/i,"Amazon Ads"],
-  [/amazon/i,"Amazon US Marketplace"],
-  [/email/i,"Email"],
-];
-
-function assetLabelFromRecommendation(title:string){
-  for(const[pattern,label]of assetAliases)if(pattern.test(title))return label;
-  return "";
-}
-
-function savedCopy(campaign:Campaign):BuilderCopy{
-  for(const rec of campaign.recommendations??[]){
-    for(const action of rec.actions??[]){
-      if(action.actionType!=="CREATIVE_DRAFT"||!action.description?.trim().startsWith("{"))continue;
-      try{
-        const parsed=JSON.parse(action.description) as {headline?:string;body?:string;cta?:string};
-        return{headline:parsed.headline,body:parsed.body,cta:parsed.cta};
-      }catch{}
-    }
-  }
-  return{};
-}
-
-function wooOpportunityLabels(campaign:Campaign){
-  return (campaign.recommendations??[])
-    .map(r=>r.title??"")
-    .filter(t=>/^WooCommerce\s*·/i.test(t))
-    .map(t=>t.replace(/^WooCommerce\s*·\s*/i,"").trim())
-    .filter(Boolean);
-}
+const assetAliases:[RegExp,string][]=[[/website homepage/i,"Website Homepage"],[/woocommerce/i,"WooCommerce Store"],[/pinterest/i,"Pinterest"],[/tiktok/i,"TikTok"],[/facebook|instagram|meta/i,"Facebook / Instagram"],[/bing|microsoft/i,"Bing / Microsoft Ads"],[/walmart connect|walmart ads/i,"Walmart Connect Ads"],[/walmart/i,"Walmart Marketplace"],[/amazon canada|amazon ca/i,"Amazon Canada Marketplace"],[/amazon ads/i,"Amazon Ads"],[/amazon/i,"Amazon US Marketplace"],[/email/i,"Email"]];
+function assetLabelFromRecommendation(title:string){for(const[pattern,label]of assetAliases)if(pattern.test(title))return label;return"";}
+function savedCopy(campaign:Campaign){for(const rec of campaign.recommendations??[])for(const action of rec.actions??[]){if(action.actionType!=="CREATIVE_DRAFT"||!action.description?.trim().startsWith("{"))continue;try{const p=JSON.parse(action.description) as {headline?:string;body?:string;cta?:string};return{headline:p.headline,body:p.body,cta:p.cta}}catch{}}return{};}
+function wooOpportunityLabels(campaign:Campaign){return(campaign.recommendations??[]).map(r=>r.title??"").filter(t=>/^WooCommerce\s*·/i.test(t)).map(t=>t.replace(/^WooCommerce\s*·\s*/i,"").trim()).filter(Boolean);}
 
 export default function CampaignDraftPersistence(){
-  const pathname=usePathname();
-  const[campaigns,setCampaigns]=useState<Campaign[]>([]);
-  const[selectedId,setSelectedId]=useState("");
-  const[status,setStatus]=useState("Start a new campaign, or select an incomplete/active campaign to resume.");
-  const[ready,setReady]=useState(false);
+ const pathname=usePathname();
+ const[campaigns,setCampaigns]=useState<Campaign[]>([]),[selectedId,setSelectedId]=useState(""),[status,setStatus]=useState("Start a new campaign, or select an incomplete/active campaign to resume."),[ready,setReady]=useState(false),[saving,setSaving]=useState(false),[formRevision,setFormRevision]=useState(0);
+ const resumable=useMemo(()=>campaigns.filter(c=>incomplete(c.status)),[campaigns]);
+ const selectedCampaign=campaigns.find(c=>c.id===selectedId);
 
-  const resumable=useMemo(()=>campaigns.filter(c=>incomplete(c.status)),[campaigns]);
+ useEffect(()=>{if(pathname!=="/campaigns")return;try{localStorage.removeItem(OLD_DRAFT_KEY);localStorage.removeItem(ACTIVE_KEY)}catch{};fetch("/api/campaigns",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error())).then(data=>setCampaigns(data.campaigns??[])).catch(()=>setStatus("Campaign list could not be loaded. You can still start a new campaign."));setReady(true)},[pathname]);
+ useEffect(()=>{if(pathname!=="/campaigns"||!ready)return;let cancelled=false,attempts=0;const timer=window.setInterval(()=>{if(cancelled)return;const step1=document.querySelector<HTMLElement>(".campaign-details-card"),rows=document.querySelectorAll(".campaign-table tbody tr"),channels=document.querySelectorAll("#channels .opportunity-channel-card");if(step1&&rows.length&&channels.length){window.clearInterval(timer);if(!selectedId)resetForm()}else if(++attempts>40)window.clearInterval(timer)},100);return()=>{cancelled=true;window.clearInterval(timer)}},[pathname,ready]);
+ useEffect(()=>{if(pathname!=="/campaigns")return;const onChange=()=>setFormRevision(v=>v+1);document.addEventListener("input",onChange,true);document.addEventListener("change",onChange,true);return()=>{document.removeEventListener("input",onChange,true);document.removeEventListener("change",onChange,true)}},[pathname]);
 
-  useEffect(()=>{
-    if(pathname!=="/campaigns")return;
-    try{localStorage.removeItem(OLD_DRAFT_KEY);}catch{}
-    fetch("/api/campaigns",{cache:"no-store"})
-      .then(r=>r.ok?r.json():Promise.reject(new Error("Unable to load campaigns")))
-      .then(data=>setCampaigns(data.campaigns??[]))
-      .catch(()=>setStatus("Campaign list could not be loaded. You can still start a new campaign."));
-    setReady(true);
-  },[pathname]);
+ function getStep1(){return document.querySelector<HTMLElement>(".campaign-details-card")}
+ function getMessaging(){return Array.from(document.querySelectorAll<HTMLElement>(".campaign-stage-panel")).find(p=>text(p.querySelector("h2")).includes("Edit and approve the campaign messaging"))}
+ function snapshot():Snapshot{const step1=getStep1(),inputs=step1?Array.from(step1.querySelectorAll<HTMLInputElement>("input")):[],name=inputs.find(i=>i.type!=="date")?.value.trim()??"",dates=inputs.filter(i=>i.type==="date"),objective=step1?.querySelector<HTMLTextAreaElement>("textarea")?.value??"";const selectedTemplate=text(step1?.querySelector(".template-card.selected strong"));const productSkus=Array.from(document.querySelectorAll<HTMLTableRowElement>(".campaign-table tbody tr")).filter(r=>r.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).map(r=>text(r.querySelector("td:nth-child(2) small"))).filter(Boolean);const activeAssets:string[]=[],opportunities:Record<string,string[]>={};document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{const asset=text(card.querySelector(".asset-select strong")),active=!!card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]')?.checked;if(!asset||!active)return;activeAssets.push(asset);opportunities[asset]=Array.from(card.querySelectorAll<HTMLElement>(".opportunity-option")).filter(o=>o.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).map(o=>text(o.querySelector("strong")).replace(/Paid$/,"" ).trim()).filter(Boolean)});const messaging=getMessaging(),mInputs=messaging?Array.from(messaging.querySelectorAll<HTMLInputElement>("input")):[],areas=messaging?Array.from(messaging.querySelectorAll<HTMLTextAreaElement>("textarea")):[];return{name,startDate:dates[0]?.value??"",endDate:dates[1]?.value??"",objective,state:{templateName:selectedTemplate,productSkus,activeAssets,opportunities,headline:mInputs[0]?.value??"",cta:mInputs[1]?.value??"",coreMessage:areas[0]?.value??""}}}
 
-  useEffect(()=>{
-    if(pathname!=="/campaigns"||!ready)return;
-    let cancelled=false,attempts=0;
-    const timer=window.setInterval(()=>{
-      if(cancelled)return;
-      const step1=document.querySelector<HTMLElement>(".campaign-details-card");
-      const rows=document.querySelectorAll(".campaign-table tbody tr");
-      const channels=document.querySelectorAll("#channels .opportunity-channel-card");
-      if(step1&&rows.length&&channels.length){
-        window.clearInterval(timer);
-        if(!selectedId)resetForm();
-      }else if(++attempts>40)window.clearInterval(timer);
-    },100);
-    return()=>{cancelled=true;window.clearInterval(timer)};
-  },[pathname,ready]);
+ function recommendedWindow(){const snap=snapshot(),duration=daysInclusive(snap.startDate,snap.endDate);let start=addDays(new Date(),8);start.setHours(12,0,0,0);for(let guard=0;guard<120;guard++){const end=addDays(start,duration-1);const conflict=resumable.filter(c=>c.id!==selectedId).map(c=>({c,start:new Date(`${campaignDate(c.startDate)}T12:00:00`),end:new Date(`${campaignDate(c.endDate)}T12:00:00`)})).filter(x=>!Number.isNaN(x.start.getTime())&&!Number.isNaN(x.end.getTime())).find(x=>rangesOverlap(start,end,x.start,x.end));if(!conflict)return{start:localIso(start),end:localIso(end),duration};start=addDays(conflict.end,1)}const end=addDays(start,duration-1);return{start:localIso(start),end:localIso(end),duration}}
+ const recommendation=pathname==="/campaigns"&&ready?recommendedWindow():null;
 
-  function getStep1(){return document.querySelector<HTMLElement>(".campaign-details-card");}
-  function getMessaging(){return Array.from(document.querySelectorAll<HTMLElement>(".campaign-stage-panel")).find(p=>text(p.querySelector("h2")).includes("Edit and approve the campaign messaging"));}
+ function applyRecommendedWindow(){if(!recommendation)return;const step1=getStep1();if(!step1)return;const dates=Array.from(step1.querySelectorAll<HTMLInputElement>('input[type="date"]'));if(dates[0])setNativeValue(dates[0],recommendation.start);if(dates[1])setNativeValue(dates[1],recommendation.end);setStatus(`Recommended conflict-free window applied: ${recommendation.start} through ${recommendation.end}. Dates remain fully editable.`)}
+ function announceActive(id:string,name:string){try{if(id)localStorage.setItem(ACTIVE_KEY,id);else localStorage.removeItem(ACTIVE_KEY)}catch{};window.dispatchEvent(new CustomEvent("lmg-active-campaign-change",{detail:{id,name}}))}
 
-  function resetForm(){
-    const step1=getStep1();
-    if(!step1)return;
-    const inputs=Array.from(step1.querySelectorAll<HTMLInputElement>("input"));
-    const name=inputs.find(i=>i.type!=="date");
-    const dates=inputs.filter(i=>i.type==="date");
-    const objective=step1.querySelector<HTMLTextAreaElement>("textarea");
-    if(name)setNativeValue(name,"");
-    dates.forEach(d=>setNativeValue(d,""));
-    if(objective)setNativeValue(objective,"");
+ function resetForm(){const step1=getStep1();if(!step1)return;const inputs=Array.from(step1.querySelectorAll<HTMLInputElement>("input")),name=inputs.find(i=>i.type!=="date"),dates=inputs.filter(i=>i.type==="date"),objective=step1.querySelector<HTMLTextAreaElement>("textarea");if(name)setNativeValue(name,"");dates.forEach(d=>setNativeValue(d,""));if(objective)setNativeValue(objective,"");document.querySelectorAll<HTMLInputElement>('.campaign-table tbody input[type="checkbox"]:checked').forEach(b=>b.click());document.querySelectorAll<HTMLInputElement>('#channels .asset-select input[type="checkbox"]:checked').forEach(b=>b.click());const messaging=getMessaging();if(messaging){messaging.querySelectorAll<HTMLInputElement>("input").forEach(i=>setNativeValue(i,""));messaging.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(a=>setNativeValue(a,""))}announceActive("","");setStatus("Blank campaign ready. Give it a name and use Save Draft whenever you want to preserve your work.")}
+ function waitForBuilder(work:()=>void){let tries=0;const run=()=>{const ok=!!getStep1()&&document.querySelectorAll(".campaign-table tbody tr").length>0&&document.querySelectorAll("#channels .opportunity-channel-card").length>0;if(ok){work();return}if(++tries<50)window.setTimeout(run,100);else setStatus("The campaign form did not finish loading. Refresh and try again.")};run()}
 
-    document.querySelectorAll<HTMLInputElement>('.campaign-table tbody input[type="checkbox"]:checked').forEach(box=>box.click());
-    document.querySelectorAll<HTMLInputElement>('#channels .asset-select input[type="checkbox"]:checked').forEach(box=>box.click());
+ function loadCampaign(campaign:Campaign){resetForm();const step1=getStep1();if(!step1)return;const inputs=Array.from(step1.querySelectorAll<HTMLInputElement>("input")),name=inputs.find(i=>i.type!=="date"),dates=inputs.filter(i=>i.type==="date"),objective=step1.querySelector<HTMLTextAreaElement>("textarea"),state=parseBuilderState(campaign);if(name)setNativeValue(name,campaign.name??"");if(dates[0])setNativeValue(dates[0],campaignDate(campaign.startDate));if(dates[1])setNativeValue(dates[1],campaignDate(campaign.endDate));if(objective)setNativeValue(objective,campaign.objective??"");const wantedSkus=new Set(state.productSkus?.length?state.productSkus:(campaign.products??[]).map(p=>p.product.sku));document.querySelectorAll<HTMLTableRowElement>(".campaign-table tbody tr").forEach(row=>{const sku=text(row.querySelector("td:nth-child(2) small")),box=row.querySelector<HTMLInputElement>('input[type="checkbox"]');if(box&&wantedSkus.has(sku)&&!box.checked)box.click()});const wantedAssets=new Set(state.activeAssets??[]);if(!wantedAssets.size)for(const rec of campaign.recommendations??[]){const label=assetLabelFromRecommendation(rec.title??"");if(label)wantedAssets.add(label)};document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{const label=text(card.querySelector(".asset-select strong")),box=card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]');if(box&&wantedAssets.has(label)&&!box.checked)box.click()});window.setTimeout(()=>{document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{const asset=text(card.querySelector(".asset-select strong")),wanted=state.opportunities?.[asset]??[];if(!wanted.length&&asset==="WooCommerce Store")wanted.push(...wooOpportunityLabels(campaign));if(!wanted.length)return;card.querySelectorAll<HTMLElement>(".opportunity-option").forEach(option=>{const label=text(option.querySelector("strong")).replace(/Paid$/,"" ).trim(),box=option.querySelector<HTMLInputElement>('input[type="checkbox"]'),should=wanted.some(saved=>saved===label||saved.includes(label)||label.includes(saved));if(box&&box.checked!==should)box.click()})});const fallback=savedCopy(campaign),messaging=getMessaging();if(messaging){const mInputs=Array.from(messaging.querySelectorAll<HTMLInputElement>("input")),areas=Array.from(messaging.querySelectorAll<HTMLTextAreaElement>("textarea"));if(mInputs[0])setNativeValue(mInputs[0],state.headline??fallback.headline??"");if(mInputs[1])setNativeValue(mInputs[1],state.cta??fallback.cta??"");if(areas[0])setNativeValue(areas[0],state.coreMessage??fallback.body??"");if(areas[1]&&campaign.objective!=null)setNativeValue(areas[1],campaign.objective)}announceActive(campaign.id,campaign.name);setStatus(`Loaded ${campaign.name} (${campaign.status}). Continue anywhere you left off, then Save Draft again.`)},120)}
 
-    const messaging=getMessaging();
-    if(messaging){
-      messaging.querySelectorAll<HTMLInputElement>("input").forEach(i=>setNativeValue(i,""));
-      messaging.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(a=>setNativeValue(a,""));
-    }
-    setStatus("Blank campaign ready. Nothing from the previous session has been loaded.");
-  }
+ function choose(value:string){setSelectedId(value);if(!value){waitForBuilder(resetForm);return}const campaign=campaigns.find(c=>c.id===value);if(campaign)waitForBuilder(()=>loadCampaign(campaign))}
+ async function saveDraft(){const snap=snapshot();if(!snap.name){setStatus("Give the campaign a name before saving it.");return}setSaving(true);setStatus("Saving campaign draft…");try{const r=await fetch("/api/campaigns/draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({campaignId:selectedId||undefined,name:snap.name,objective:snap.objective,startDate:snap.startDate,endDate:snap.endDate,state:snap.state})}),data=await r.json();if(!r.ok)throw new Error(data.error||"Unable to save draft");const saved=data.campaign as Campaign;setCampaigns(current=>[saved,...current.filter(c=>c.id!==saved.id)]);setSelectedId(saved.id);announceActive(saved.id,saved.name);setStatus(`${saved.name} saved as ${saved.status}. You can leave this page and resume it later from the campaign list.`)}catch(e){setStatus(e instanceof Error?e.message:"Unable to save draft.")}finally{setSaving(false)}}
 
-  function waitForBuilder(work:()=>void){
-    let tries=0;
-    const run=()=>{
-      const ready=!!getStep1()&&document.querySelectorAll(".campaign-table tbody tr").length>0&&document.querySelectorAll("#channels .opportunity-channel-card").length>0;
-      if(ready){work();return;}
-      if(++tries<50)window.setTimeout(run,100);
-      else setStatus("The campaign form did not finish loading. Refresh and try selecting the campaign again.");
-    };
-    run();
-  }
-
-  function loadCampaign(campaign:Campaign){
-    resetForm();
-    const step1=getStep1();
-    if(!step1)return;
-    const inputs=Array.from(step1.querySelectorAll<HTMLInputElement>("input"));
-    const name=inputs.find(i=>i.type!=="date");
-    const dates=inputs.filter(i=>i.type==="date");
-    const objective=step1.querySelector<HTMLTextAreaElement>("textarea");
-    if(name)setNativeValue(name,campaign.name??"");
-    if(dates[0])setNativeValue(dates[0],campaignDate(campaign.startDate));
-    if(dates[1])setNativeValue(dates[1],campaignDate(campaign.endDate));
-    if(objective)setNativeValue(objective,campaign.objective??"");
-
-    const wantedSkus=new Set((campaign.products??[]).map(p=>p.product.sku));
-    document.querySelectorAll<HTMLTableRowElement>(".campaign-table tbody tr").forEach(row=>{
-      const sku=text(row.querySelector("td:nth-child(2) small"));
-      const box=row.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      if(box&&wantedSkus.has(sku)&&!box.checked)box.click();
-    });
-
-    const wantedAssets=new Set<string>();
-    for(const rec of campaign.recommendations??[]){
-      const label=assetLabelFromRecommendation(rec.title??"");
-      if(label)wantedAssets.add(label);
-    }
-    document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{
-      const label=text(card.querySelector(".asset-select strong"));
-      const box=card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]');
-      if(box&&wantedAssets.has(label)&&!box.checked)box.click();
-    });
-
-    window.setTimeout(()=>{
-      const wantedWoo=new Set(wooOpportunityLabels(campaign));
-      if(wantedWoo.size){
-        document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{
-          if(text(card.querySelector(".asset-select strong"))!=="WooCommerce Store")return;
-          card.querySelectorAll<HTMLElement>(".opportunity-option").forEach(option=>{
-            const label=text(option.querySelector("strong")).replace(/Paid$/,"" ).trim();
-            const box=option.querySelector<HTMLInputElement>('input[type="checkbox"]');
-            const should=Array.from(wantedWoo).some(saved=>saved===label||saved.includes(label)||label.includes(saved));
-            if(box&&box.checked!==should)box.click();
-          });
-        });
-      }
-
-      const copy=savedCopy(campaign),messaging=getMessaging();
-      if(messaging){
-        const mInputs=Array.from(messaging.querySelectorAll<HTMLInputElement>("input"));
-        const areas=Array.from(messaging.querySelectorAll<HTMLTextAreaElement>("textarea"));
-        if(mInputs[0]&&copy.headline!=null)setNativeValue(mInputs[0],copy.headline);
-        if(mInputs[1]&&copy.cta!=null)setNativeValue(mInputs[1],copy.cta);
-        if(areas[0]&&copy.body!=null)setNativeValue(areas[0],copy.body);
-        if(areas[1]&&campaign.objective!=null)setNativeValue(areas[1],campaign.objective);
-      }
-      setStatus(`Loaded ${campaign.name} (${campaign.status}). Review or edit any field before continuing.`);
-    },100);
-  }
-
-  function choose(value:string){
-    setSelectedId(value);
-    if(!value){waitForBuilder(resetForm);return;}
-    const campaign=campaigns.find(c=>c.id===value);
-    if(campaign)waitForBuilder(()=>loadCampaign(campaign));
-  }
-
-  if(pathname!=="/campaigns")return null;
-
-  return <section style={{maxWidth:1100,margin:"18px auto 4px",padding:"16px 18px",border:"1px solid #d7dfd1",borderRadius:14,background:"#fff",boxShadow:"0 6px 18px rgba(30,50,30,.06)"}}>
-    <div style={{display:"grid",gridTemplateColumns:"minmax(260px,1fr) minmax(320px,2fr)",gap:16,alignItems:"end"}}>
-      <label style={{display:"grid",gap:6,fontWeight:800,color:"#233b27"}}>
-        Campaign to work on
-        <select value={selectedId} onChange={e=>choose(e.target.value)} style={{width:"100%",padding:"10px 12px",border:"1px solid #aebca8",borderRadius:8,background:"white",fontSize:15}}>
-          <option value="">+ Start a new campaign (blank)</option>
-          {resumable.map(c=><option key={c.id} value={c.id}>{c.name} · {c.status}</option>)}
-        </select>
-      </label>
-      <p style={{margin:0,padding:"10px 12px",borderRadius:8,background:"#f5f8f2",color:"#526052",fontSize:14}}>{status}</p>
+ if(pathname!=="/campaigns")return null;
+ const liveName=snapshot().name||selectedCampaign?.name||"New Campaign";
+ return <section style={{maxWidth:1180,margin:"18px auto 4px",display:"grid",gap:12}}>
+   <div style={{padding:"16px 20px",borderRadius:15,background:"#183b24",color:"white",boxShadow:"0 8px 24px rgba(25,55,35,.16)"}}><div style={{fontSize:12,fontWeight:900,letterSpacing:".12em",textTransform:"uppercase",opacity:.78}}>Campaign currently being created / edited</div><div style={{fontSize:28,fontWeight:900,lineHeight:1.15,marginTop:4}}>{liveName}</div></div>
+   <div style={{padding:"16px 18px",border:"1px solid #d7dfd1",borderRadius:14,background:"#fff",boxShadow:"0 6px 18px rgba(30,50,30,.06)"}}>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(250px,1fr) minmax(260px,1fr) auto",gap:14,alignItems:"end"}}>
+      <label style={{display:"grid",gap:6,fontWeight:800,color:"#233b27"}}>Campaign to work on<select value={selectedId} onChange={e=>choose(e.target.value)} style={{width:"100%",padding:"10px 12px",border:"1px solid #aebca8",borderRadius:8,background:"white",fontSize:15}}><option value="">+ Start a new campaign (blank)</option>{resumable.map(c=><option key={c.id} value={c.id}>{c.name} · {c.status}</option>)}</select></label>
+      <div style={{padding:"9px 12px",borderRadius:9,background:"#f5f8f2",color:"#314c35",fontSize:14}}><strong>Recommended open window</strong><div>{recommendation?.start} → {recommendation?.end} · {recommendation?.duration} days</div><button type="button" onClick={applyRecommendedWindow} style={{marginTop:6,padding:"6px 9px",borderRadius:7,border:"1px solid #8ca18b",background:"white",fontWeight:800,cursor:"pointer"}}>Use recommended dates</button></div>
+      <button type="button" onClick={saveDraft} disabled={saving} style={{padding:"11px 16px",border:0,borderRadius:9,background:"#183b24",color:"white",fontWeight:900,cursor:saving?"wait":"pointer",minWidth:130}}>{saving?"Saving…":"Save Draft"}</button>
     </div>
-  </section>;
+    <p style={{margin:"12px 0 0",padding:"9px 11px",borderRadius:8,background:"#f8faf6",color:"#526052",fontSize:14}}>{status}</p>
+   </div>
+ </section>;
 }
