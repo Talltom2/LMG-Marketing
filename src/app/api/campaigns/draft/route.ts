@@ -64,3 +64,18 @@ export async function POST(request:NextRequest){
     return NextResponse.json({error:error instanceof Error?error.message:"Unable to save campaign draft."},{status:500});
   }
 }
+
+export async function DELETE(request:NextRequest){
+  try{
+    const body=await request.json() as Record<string,unknown>;
+    const campaignId=String(body.campaignId||"").trim();
+    if(!campaignId)return NextResponse.json({error:"Campaign id is required."},{status:400});
+    const campaign=await db.campaign.findUnique({where:{id:campaignId},select:{id:true,name:true,status:true}});
+    if(!campaign)return NextResponse.json({error:"Campaign not found."},{status:404});
+    if(campaign.status!==CampaignStatus.DRAFT)return NextResponse.json({error:"Only DRAFT campaigns can be deleted. Planned, active and completed campaign history is retained."},{status:409});
+    await db.campaign.delete({where:{id:campaignId}});
+    return NextResponse.json({deleted:true,campaign});
+  }catch(error){
+    return NextResponse.json({error:error instanceof Error?error.message:"Unable to delete campaign draft."},{status:500});
+  }
+}
