@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {usePathname} from "next/navigation";
 
 type Action={actionType?:string;description?:string};
@@ -26,8 +26,11 @@ function oldCopy(c:Campaign){for(const rec of c.recommendations??[])for(const a 
 
 export default function CampaignWorkspaceManager(){
  const pathname=usePathname();
- const[campaigns,setCampaigns]=useState<Campaign[]>([]),[selectedId,setSelectedId]=useState(""),[currentName,setCurrentName]=useState("New Campaign"),[status,setStatus]=useState("Start a new campaign or resume one already in progress."),[saving,setSaving]=useState(false),[recommendation,setRecommendation]=useState<{start:string;end:string;days:number}|null>(null);
+ const workspaceRef=useRef<HTMLElement|null>(null);
+ const[campaigns,setCampaigns]=useState<Campaign[]>([]),[selectedId,setSelectedId]=useState(""),[currentName,setCurrentName]=useState("New Campaign"),[status,setStatus]=useState("Start a new campaign or resume one already in progress."),[saving,setSaving]=useState(false),[deleting,setDeleting]=useState(false),[recommendation,setRecommendation]=useState<{start:string;end:string;days:number}|null>(null);
  const resumable=useMemo(()=>campaigns.filter(c=>!closed.has(c.status.toUpperCase())),[campaigns]);
+ const selectedCampaign=campaigns.find(c=>c.id===selectedId);
+ const canDelete=selectedCampaign?.status.toUpperCase()==="DRAFT";
 
  function step1(){return document.querySelector<HTMLElement>(".campaign-details-card")}
  function messaging(){return Array.from(document.querySelectorAll<HTMLElement>(".campaign-stage-panel")).find(p=>text(p.querySelector("h2")).includes("Edit and approve the campaign messaging"))}
@@ -40,18 +43,20 @@ export default function CampaignWorkspaceManager(){
 
  useEffect(()=>{if(pathname!=="/campaigns")return;fetch("/api/campaigns",{cache:"no-store"}).then(r=>r.json()).then(d=>setCampaigns(d.campaigns??[])).catch(()=>setStatus("Campaign list could not be loaded."));wait(clearForm)},[pathname]);
  useEffect(()=>{if(pathname!=="/campaigns")return;const changed=()=>{const n=step1()?.querySelector<HTMLInputElement>('input:not([type="date"])')?.value.trim();setCurrentName(n||"New Campaign");calculateRecommendation()};document.addEventListener("input",changed,true);document.addEventListener("change",changed,true);return()=>{document.removeEventListener("input",changed,true);document.removeEventListener("change",changed,true)}},[pathname,campaigns,selectedId]);
+ useEffect(()=>{if(pathname!=="/campaigns")return;let tries=0;const place=()=>{const workspace=workspaceRef.current,topbar=document.querySelector<HTMLElement>(".campaign-topbar");if(workspace&&topbar&&topbar.parentElement){topbar.insertAdjacentElement("afterend",workspace);return}if(++tries<40)setTimeout(place,100)};place()},[pathname]);
 
  function choose(id:string){setSelectedId(id);if(!id){wait(clearForm);return}const c=campaigns.find(x=>x.id===id);if(c)wait(()=>load(c))}
- function useDates(){if(!recommendation)return;const dates=Array.from(step1()?.querySelectorAll<HTMLInputElement>('input[type="date"]')??[]);if(dates[0])setValue(dates[0],recommendation.start);if(dates[1])setValue(dates[1],recommendation.end);setStatus(`Recommended conflict-free window applied. You can edit either date.`)}
+ function useDates(){if(!recommendation)return;const dates=Array.from(step1()?.querySelectorAll<HTMLInputElement>('input[type="date"]')??[]);if(dates[0])setValue(dates[0],recommendation.start);if(dates[1])setValue(dates[1],recommendation.end);setStatus("Recommended conflict-free window applied. You can edit either date.")}
  async function save(){const s=snapshot();if(!s.name){setStatus("Give the campaign a name before saving.");return}setSaving(true);setStatus("Saving draft…");try{const r=await fetch("/api/campaigns/draft",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({campaignId:selectedId||undefined,name:s.name,objective:s.objective,startDate:s.startDate,endDate:s.endDate,state:s.state})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Unable to save draft");const c=d.campaign as Campaign;setCampaigns(cur=>[c,...cur.filter(x=>x.id!==c.id)]);setSelectedId(c.id);setCurrentName(c.name);announce(c.id,c.name);setStatus(`${c.name} saved. It will remain in the resume list until the campaign is completed.`)}catch(e){setStatus(e instanceof Error?e.message:"Unable to save draft.")}finally{setSaving(false)}}
+ async function deleteDraft(){if(!selectedCampaign||!canDelete)return;const ok=window.confirm(`Delete draft campaign “${selectedCampaign.name}”?\n\nThis permanently removes the saved draft and its builder state.`);if(!ok)return;setDeleting(true);setStatus(`Deleting ${selectedCampaign.name}…`);try{const r=await fetch("/api/campaigns/draft",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({campaignId:selectedCampaign.id})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Unable to delete draft");setCampaigns(cur=>cur.filter(c=>c.id!==selectedCampaign.id));setSelectedId("");wait(clearForm);setStatus(`${selectedCampaign.name} was deleted. A blank campaign is ready.`)}catch(e){setStatus(e instanceof Error?e.message:"Unable to delete draft.")}finally{setDeleting(false)}}
 
  if(pathname!=="/campaigns")return null;
- return <section style={{maxWidth:1180,margin:"18px auto 4px",display:"grid",gap:12}}>
+ return <section ref={workspaceRef} style={{width:"100%",maxWidth:"none",margin:"14px 0 22px",display:"grid",gap:12}}>
   <div style={{padding:"16px 20px",borderRadius:15,background:"#183b24",color:"white",boxShadow:"0 8px 24px rgba(25,55,35,.16)"}}><div style={{fontSize:12,fontWeight:900,letterSpacing:".12em",textTransform:"uppercase",opacity:.78}}>Campaign currently being created / edited</div><div style={{fontSize:29,fontWeight:900,marginTop:4}}>{currentName}</div></div>
-  <div style={{padding:"16px 18px",border:"1px solid #d7dfd1",borderRadius:14,background:"white",boxShadow:"0 6px 18px rgba(30,50,30,.06)"}}><div style={{display:"grid",gridTemplateColumns:"minmax(250px,1fr) minmax(260px,1fr) auto",gap:14,alignItems:"end"}}>
+  <div style={{padding:"16px 18px",border:"1px solid #d7dfd1",borderRadius:14,background:"white",boxShadow:"0 6px 18px rgba(30,50,30,.06)"}}><div style={{display:"grid",gridTemplateColumns:"minmax(250px,1.3fr) minmax(260px,1fr) auto",gap:14,alignItems:"end"}}>
    <label style={{display:"grid",gap:6,fontWeight:800,color:"#233b27"}}>Campaign to work on<select value={selectedId} onChange={e=>choose(e.target.value)} style={{padding:"10px 12px",border:"1px solid #aebca8",borderRadius:8,background:"white",fontSize:15}}><option value="">+ Start a new campaign (blank)</option>{resumable.map(c=><option key={c.id} value={c.id}>{c.name} · {c.status}</option>)}</select></label>
    <div style={{padding:"9px 12px",borderRadius:9,background:"#f5f8f2",color:"#314c35",fontSize:14}}><strong>Recommended open campaign window</strong><div>{recommendation?`${recommendation.start} → ${recommendation.end} · ${recommendation.days} days`:"Calculating…"}</div><button type="button" onClick={useDates} disabled={!recommendation} style={{marginTop:6,padding:"6px 9px",borderRadius:7,border:"1px solid #8ca18b",background:"white",fontWeight:800}}>Use recommended dates</button></div>
-   <button type="button" onClick={save} disabled={saving} style={{padding:"11px 16px",border:0,borderRadius:9,background:"#183b24",color:"white",fontWeight:900,minWidth:130}}>{saving?"Saving…":"Save Draft"}</button>
+   <div style={{display:"flex",gap:8,alignItems:"center"}}><button type="button" onClick={save} disabled={saving||deleting} style={{padding:"11px 16px",border:0,borderRadius:9,background:"#183b24",color:"white",fontWeight:900,minWidth:112}}>{saving?"Saving…":"Save Draft"}</button>{canDelete&&<button type="button" onClick={deleteDraft} disabled={saving||deleting} style={{padding:"11px 14px",border:"1px solid #a72b2b",borderRadius:9,background:"white",color:"#a72b2b",fontWeight:900,minWidth:112}}>{deleting?"Deleting…":"Delete Draft"}</button>}</div>
   </div><p style={{margin:"12px 0 0",padding:"9px 11px",borderRadius:8,background:"#f8faf6",color:"#526052",fontSize:14}}>{status}</p></div>
  </section>;
 }
