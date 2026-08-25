@@ -1,5 +1,100 @@
 "use client";
-import{useEffect,useMemo,useState}from"react";import LmgTopNav from"@/components/LmgTopNav";
-type Campaign={id:string;name:string;status:string};type Asset={recommendationId:string;channel:string;status:string;creative:string;format:string;deliverables:string[];paid:boolean;connection:{state:string;note:string};approvedAt?:string|null;scheduledFor?:string|null;publishedAt?:string|null;result?:string|null};type Production={campaign:{id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;products:{sku:string;name:string;role?:string|null}[]};assets:Asset[];summary:{total:number;approved:number;scheduled:number;published:number;needsConnection:number}};
-const labels:Record<string,string>={DRAFT_READY:"Draft ready",APPROVED:"Approved",READY_CONNECTION_REQUIRED:"Ready · connection required",SCHEDULED:"Scheduled",PUBLISHED:"Published"};
-export default function ProductionPage(){const[campaigns,setCampaigns]=useState<Campaign[]>([]),[id,setId]=useState(""),[data,setData]=useState<Production|null>(null),[busy,setBusy]=useState(""),[edits,setEdits]=useState<Record<string,string>>({}),[schedules,setSchedules]=useState<Record<string,string>>({});useEffect(()=>{fetch('/api/campaigns',{cache:'no-store'}).then(r=>r.json()).then(x=>{const c=x.campaigns??[];setCampaigns(c);if(c[0])setId(c[0].id)})},[]);const load=()=>id&&fetch(`/api/campaigns/${id}/production`,{cache:'no-store'}).then(r=>r.json()).then((x:Production)=>{setData(x);setEdits(Object.fromEntries(x.assets.map(a=>[a.recommendationId,a.creative])))});useEffect(()=>{void load()},[id]);async function act(a:Asset,operation:string,extra:Record<string,unknown>={}){setBusy(a.recommendationId+operation);await fetch(`/api/campaigns/${id}/production`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recommendationId:a.recommendationId,operation,creative:edits[a.recommendationId],...extra})});await load();setBusy("")}const readiness=useMemo(()=>!data?0:Math.round(data.summary.approved/Math.max(1,data.summary.total)*100),[data]);return <main className="prod-shell"><LmgTopNav active="/campaigns/production"/><header className="prod-hero"><div><p className="eyebrow">Final Campaign Production Layer</p><h1>Creative Production & Channel Execution</h1><p>Turn approved campaign plans into channel-ready assets, authorize them, schedule them, and track publication through one execution queue.</p></div><div className="prod-readiness"><span>Campaign readiness</span><strong>{readiness}%</strong><small>{data?.summary.approved??0} of {data?.summary.total??0} assets authorized</small></div></header><section className="prod-picker"><label>Campaign<select value={id} onChange={e=>setId(e.target.value)}>{campaigns.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{data&&<div><b>{data.campaign.status}</b><span>{data.campaign.startDate.slice(0,10)} → {data.campaign.endDate.slice(0,10)}</span></div>}</section>{data&&<><section className="prod-summary">{[["Assets",data.summary.total],["Authorized",data.summary.approved],["Scheduled",data.summary.scheduled],["Published",data.summary.published],["Need connection",data.summary.needsConnection]].map(([l,n])=><article key={String(l)}><span>{l}</span><strong>{n}</strong></article>)}</section><section className="prod-panel campaign-brief"><div><p className="eyebrow">Production brief</p><h2>{data.campaign.name}</h2><p>{data.campaign.objective||"No campaign objective recorded."}</p></div><div className="product-chips">{data.campaign.products.map(p=><span key={p.sku}><b>{p.role||"PRODUCT"}</b>{p.name}<small>{p.sku}</small></span>)}</div></section><section className="prod-assets">{data.assets.map(a=><article className={`prod-card status-${a.status.toLowerCase()}`} key={a.recommendationId}><div className="prod-card-head"><div><p className="eyebrow">{a.channel}</p><h2>{a.channel} production package</h2></div><span className="asset-status">{labels[a.status]||a.status}</span></div><div className="spec-row"><div><small>Required format</small><strong>{a.format}</strong></div><div><small>Execution connection</small><strong>{a.connection.state.replaceAll('_',' ')}</strong><p>{a.connection.note}</p></div></div><div className="deliverables"><small>Deliverables</small><div>{a.deliverables.map(d=><span key={d}>{d}</span>)}</div></div><label className="creative-work"><span>Creative / production brief</span><textarea rows={7} value={edits[a.recommendationId]??a.creative} onChange={e=>setEdits({...edits,[a.recommendationId]:e.target.value})} disabled={a.status==='PUBLISHED'}/></label>{a.status==='DRAFT_READY'&&<div className="prod-actions"><button disabled={busy===a.recommendationId+'APPROVE'} onClick={()=>act(a,'APPROVE')}>Approve Creative for Execution</button><button className="secondary" onClick={()=>setEdits({...edits,[a.recommendationId]:a.creative})}>Reset Changes</button></div>}{['APPROVED','READY_CONNECTION_REQUIRED'].includes(a.status)&&<div className="schedule-box"><label>Schedule date/time<input type="datetime-local" value={schedules[a.recommendationId]??''} onChange={e=>setSchedules({...schedules,[a.recommendationId]:e.target.value})}/></label><button disabled={!schedules[a.recommendationId]||busy===a.recommendationId+'SCHEDULE'} onClick={()=>act(a,'SCHEDULE',{scheduledFor:schedules[a.recommendationId]})}>Add to Execution Queue</button></div>}{a.status==='SCHEDULED'&&<div className="execution-box"><div><strong>Queued for execution</strong><span>{a.scheduledFor?new Date(a.scheduledFor).toLocaleString():'Scheduled'}</span><small>{a.connection.note}</small></div><button className="publish" onClick={()=>act(a,'MARK_PUBLISHED',{result:`Publication manually confirmed for ${a.channel}.`})}>Record Publication</button></div>}{a.status==='PUBLISHED'&&<div className="published-box"><strong>✓ Publication recorded</strong><span>{a.publishedAt?new Date(a.publishedAt).toLocaleString():''}</span>{a.result&&<p>{a.result}</p>}</div>}</article>)}</section><section className="prod-panel execution-policy"><p className="eyebrow">Execution policy</p><h2>Approved means authorized. Connected means executable.</h2><p>LMG Marketing will never claim an external publication occurred unless the channel adapter confirms it or you explicitly record the publication. As platform API connections are completed, assets already in this queue can move from <strong>Connection Required</strong> to automatic execution without redesigning the campaign workflow.</p></section></>}</main>;}
+import { useEffect, useMemo, useState } from "react";
+import LmgTopNav from "@/components/LmgTopNav";
+
+type Campaign = { id: string; name: string; status: string };
+type Asset = {
+  recommendationId: string;
+  channel: string;
+  opportunity?: string | null;
+  title?: string;
+  status: string;
+  creative: string;
+  imagePrompt?: string | null;
+  imageResult?: string | null;
+  format: string;
+  deliverables: string[];
+  paid: boolean;
+  connection: { state: string; note: string };
+  approvedAt?: string | null;
+  scheduledFor?: string | null;
+  publishedAt?: string | null;
+  result?: string | null;
+};
+type Production = {
+  campaign: { id: string; name: string; objective?: string | null; startDate: string; endDate: string; status: string; products: { sku: string; name: string; role?: string | null }[] };
+  assets: Asset[];
+  summary: { total: number; approved: number; scheduled: number; published: number; needsConnection: number };
+};
+
+const labels: Record<string, string> = {
+  DRAFT_READY: "Draft ready",
+  APPROVED: "Approved",
+  READY_CONNECTION_REQUIRED: "Ready · connection required",
+  SCHEDULED: "Scheduled",
+  PUBLISHED: "Published",
+};
+
+export default function ProductionPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [id, setId] = useState("");
+  const [data, setData] = useState<Production | null>(null);
+  const [busy, setBusy] = useState("");
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [schedules, setSchedules] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/campaigns", { cache: "no-store" }).then((r) => r.json()).then((x) => {
+      const c = x.campaigns ?? [];
+      setCampaigns(c);
+      if (c[0]) setId(c[0].id);
+    });
+  }, []);
+
+  const load = () => id && fetch(`/api/campaigns/${id}/production`, { cache: "no-store" }).then((r) => r.json()).then((x: Production) => {
+    setData(x);
+    setEdits(Object.fromEntries(x.assets.map((a) => [a.recommendationId, a.creative])));
+  });
+  useEffect(() => { void load(); }, [id]);
+
+  async function act(a: Asset, operation: string, extra: Record<string, unknown> = {}) {
+    setBusy(a.recommendationId + operation);
+    await fetch(`/api/campaigns/${id}/production`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recommendationId: a.recommendationId, operation, creative: edits[a.recommendationId], ...extra }),
+    });
+    await load();
+    setBusy("");
+  }
+
+  const readiness = useMemo(() => !data ? 0 : Math.round(data.summary.approved / Math.max(1, data.summary.total) * 100), [data]);
+
+  return <main className="prod-shell">
+    <LmgTopNav active="/campaigns/production" />
+    <header className="prod-hero">
+      <div><p className="eyebrow">Final Campaign Production Layer</p><h1>Creative Production & Channel Execution</h1><p>Turn approved campaign plans into channel-ready assets, authorize them, schedule them, and track publication through one execution queue.</p></div>
+      <div className="prod-readiness"><span>Campaign readiness</span><strong>{readiness}%</strong><small>{data?.summary.approved ?? 0} of {data?.summary.total ?? 0} assets authorized</small></div>
+    </header>
+    <section className="prod-picker">
+      <label>Campaign<select value={id} onChange={(e) => setId(e.target.value)}>{campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      {data && <div><b>{data.campaign.status}</b><span>{data.campaign.startDate.slice(0, 10)} → {data.campaign.endDate.slice(0, 10)}</span></div>}
+    </section>
+    {data && <>
+      <section className="prod-summary">{[["Assets", data.summary.total], ["Authorized", data.summary.approved], ["Scheduled", data.summary.scheduled], ["Published", data.summary.published], ["Need connection", data.summary.needsConnection]].map(([l, n]) => <article key={String(l)}><span>{l}</span><strong>{n}</strong></article>)}</section>
+      <section className="prod-panel campaign-brief"><div><p className="eyebrow">Production brief</p><h2>{data.campaign.name}</h2><p>{data.campaign.objective || "No campaign objective recorded."}</p></div><div className="product-chips">{data.campaign.products.map((p) => <span key={p.sku}><b>{p.role || "PRODUCT"}</b>{p.name}<small>{p.sku}</small></span>)}</div></section>
+      <section className="prod-assets">{data.assets.map((a) => <article className={`prod-card status-${a.status.toLowerCase()}`} key={a.recommendationId}>
+        <div className="prod-card-head"><div><p className="eyebrow">{a.opportunity ? `${a.channel} opportunity` : a.channel}</p><h2>{a.title || `${a.channel} production package`}</h2></div><span className="asset-status">{labels[a.status] || a.status}</span></div>
+        <div className="spec-row"><div><small>Required format</small><strong>{a.format}</strong></div><div><small>Execution connection</small><strong>{a.connection.state.replaceAll("_", " ")}</strong><p>{a.connection.note}</p></div></div>
+        <div className="deliverables"><small>Deliverables</small><div>{a.deliverables.map((d) => <span key={d}>{d}</span>)}</div></div>
+        {a.imagePrompt && <div className="creative-work"><span>AI lifestyle image brief</span><p>{a.imagePrompt}</p></div>}
+        <label className="creative-work"><span>Creative / production brief</span><textarea rows={7} value={edits[a.recommendationId] ?? a.creative} onChange={(e) => setEdits({ ...edits, [a.recommendationId]: e.target.value })} disabled={a.status === "PUBLISHED"} /></label>
+        {a.status === "DRAFT_READY" && <div className="prod-actions"><button disabled={busy === a.recommendationId + "APPROVE"} onClick={() => act(a, "APPROVE")}>Approve Creative for Execution</button><button className="secondary" onClick={() => setEdits({ ...edits, [a.recommendationId]: a.creative })}>Reset Changes</button></div>}
+        {["APPROVED", "READY_CONNECTION_REQUIRED"].includes(a.status) && <div className="schedule-box"><label>Schedule date/time<input type="datetime-local" value={schedules[a.recommendationId] ?? ""} onChange={(e) => setSchedules({ ...schedules, [a.recommendationId]: e.target.value })} /></label><button disabled={!schedules[a.recommendationId] || busy === a.recommendationId + "SCHEDULE"} onClick={() => act(a, "SCHEDULE", { scheduledFor: schedules[a.recommendationId] })}>Add to Execution Queue</button></div>}
+        {a.status === "SCHEDULED" && <div className="execution-box"><div><strong>Queued for execution</strong><span>{a.scheduledFor ? new Date(a.scheduledFor).toLocaleString() : "Scheduled"}</span><small>{a.connection.note}</small></div><button className="publish" onClick={() => act(a, "MARK_PUBLISHED", { result: `Publication manually confirmed for ${a.title || a.channel}.` })}>Record Publication</button></div>}
+        {a.status === "PUBLISHED" && <div className="published-box"><strong>✓ Publication recorded</strong><span>{a.publishedAt ? new Date(a.publishedAt).toLocaleString() : ""}</span>{a.result && <p>{a.result}</p>}</div>}
+      </article>)}</section>
+      <section className="prod-panel execution-policy"><p className="eyebrow">Execution policy</p><h2>Approved means authorized. Connected means executable.</h2><p>LMG Marketing will never claim an external publication occurred unless the channel adapter confirms it or you explicitly record the publication. As platform API connections are completed, assets already in this queue can move from <strong>Connection Required</strong> to automatic execution without redesigning the campaign workflow.</p></section>
+    </>}
+  </main>;
+}
