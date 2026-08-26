@@ -14,6 +14,7 @@ import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityAp
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
 import CampaignExecutionReadyLink from "@/components/CampaignExecutionReadyLink";
+import PinterestCampaignOpportunityBridge from "@/components/PinterestCampaignOpportunityBridge";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -29,5 +30,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
