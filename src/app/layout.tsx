@@ -4,7 +4,7 @@ import PromotionalAssetsGlobalNav from "@/components/PromotionalAssetsGlobalNav"
 import PromotionalAssetsNavInjector from "@/components/PromotionalAssetsNavInjector";
 import CampaignCollectionPromoteFeedback from "@/components/CampaignCollectionPromoteFeedback";
 import CampaignWooCommerceDefaults from "@/components/CampaignWooCommerceDefaults";
-import CampaignWorkspaceV3 from "@/components/CampaignWorkspaceV3";
+import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
 import ActiveCampaignContextBanner from "@/components/ActiveCampaignContextBanner";
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
@@ -26,5 +26,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignWorkspaceV3/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
