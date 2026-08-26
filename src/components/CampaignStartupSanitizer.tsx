@@ -8,10 +8,9 @@ const RESUME_KEY="lmg-campaign-exact-resume-v4";
 const ACTIVE_KEY="lmg-active-campaign-id";
 
 /**
- * Campaign Builder historically shipped with a populated demo/default campaign.
- * On a normal visit to /campaigns we must neutralize that client-side default
- * before CampaignBuilderPage's passive effect runs. A deliberate resume stores
- * RESUME_KEY first; in that case we leave the handoff payload untouched.
+ * Neutralize obsolete demo/default campaign state only when there is no
+ * deliberately selected campaign. If ACTIVE_KEY or RESUME_KEY exists, the
+ * current campaign must survive reloads and navigation back to Build.
  */
 export default function CampaignStartupSanitizer(){
   const pathname=usePathname();
@@ -20,9 +19,9 @@ export default function CampaignStartupSanitizer(){
     if(pathname!=="/campaigns")return;
     try{
       const isDeliberateResume=!!localStorage.getItem(RESUME_KEY);
-      if(isDeliberateResume)return;
+      const hasActiveCampaign=!!localStorage.getItem(ACTIVE_KEY);
+      if(isDeliberateResume||hasActiveCampaign)return;
 
-      localStorage.removeItem(ACTIVE_KEY);
       localStorage.setItem(LEARNING_DRAFT_KEY,JSON.stringify({
         name:" ",
         objective:" ",
