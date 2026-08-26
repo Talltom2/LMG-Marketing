@@ -19,7 +19,7 @@ export default function LmgTopNav({active,global=false}:{active?:string;global?:
     </Link>
     <div className="lmg-navlinks" style={{display:"flex",alignItems:"center",gap:5,flexWrap:"nowrap",marginLeft:0,minWidth:"max-content"}}>
       {links.map(([href,label])=>{
-        const selected=active===href||Boolean(active?.startsWith(`${href}/`));
+        const selected=href==="/campaigns"?active==="/campaigns":active===href||Boolean(active?.startsWith(`${href}/`));
         return <Link key={href} href={href} className={selected?"active":""} style={{flex:"0 0 auto",display:"inline-block",padding:"9px 10px",borderRadius:9,textDecoration:"none",fontSize:13,fontWeight:800,lineHeight:1,border:selected?"1px solid #fff":"1px solid transparent",background:selected?"#fff":"transparent",color:selected?"#111":"#f4f6ef"}}>{label}</Link>
       })}
     </div>
