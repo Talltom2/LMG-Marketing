@@ -14,7 +14,8 @@ export async function POST(request:NextRequest){
   const content:any[]=[{type:"input_text",text:`${prompt}\n\nRequired composition: ${orientation}. Compose specifically for a ${orientation} marketing image and keep the principal product comfortably inside the crop-safe area.`}];
   if(sourceImageUrl)content.push({type:"input_image",image_url:sourceImageUrl});
   const size=orientation==="portrait"?"1024x1536":"1536x1024";
-  const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-5.6-terra",input:[{role:"user",content}],tools:[{type:"image_generation",model:"gpt-image-2",action:sourceImageUrl?"edit":"generate",input_fidelity:"high",size,quality:"high",output_format:"jpeg"}]})});
+  const imageTool:any={type:"image_generation",model:"gpt-image-2",action:sourceImageUrl?"edit":"generate",size,quality:"high",output_format:"jpeg"};
+  const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-5.6-terra",input:[{role:"user",content}],tools:[imageTool]})});
   const data:any=await r.json();
   if(!r.ok)return NextResponse.json({error:data?.error?.message??"Image generation failed."},{status:r.status});
   const item=(data.output??[]).find((x:any)=>x.type==="image_generation_call"||x.type==="image_generation");
