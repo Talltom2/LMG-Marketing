@@ -3,7 +3,6 @@ import GlobalCampaignNav from "@/components/GlobalCampaignNav";
 import PromotionalAssetsGlobalNav from "@/components/PromotionalAssetsGlobalNav";
 import PromotionalAssetsNavInjector from "@/components/PromotionalAssetsNavInjector";
 import CampaignCollectionPromoteFeedback from "@/components/CampaignCollectionPromoteFeedback";
-import CampaignWooCommerceDefaults from "@/components/CampaignWooCommerceDefaults";
 import CampaignStartupSanitizer from "@/components/CampaignStartupSanitizer";
 import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
 import CampaignSelectionHighlighter from "@/components/CampaignSelectionHighlighter";
@@ -15,6 +14,7 @@ import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse"
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
 import CampaignExecutionReadyLink from "@/components/CampaignExecutionReadyLink";
 import PinterestCampaignOpportunityBridge from "@/components/PinterestCampaignOpportunityBridge";
+import WooCommerceCampaignOpportunityBridge from "@/components/WooCommerceCampaignOpportunityBridge";
 import "./globals.css";
 import "./site-additions.css";
 import "./nav-bridge.css";
@@ -30,5 +30,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
