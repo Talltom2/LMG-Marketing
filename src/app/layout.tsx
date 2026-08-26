@@ -6,6 +6,7 @@ import CampaignCollectionPromoteFeedback from "@/components/CampaignCollectionPr
 import CampaignWooCommerceDefaults from "@/components/CampaignWooCommerceDefaults";
 import CampaignStartupSanitizer from "@/components/CampaignStartupSanitizer";
 import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
+import CampaignSelectionHighlighter from "@/components/CampaignSelectionHighlighter";
 import ActiveCampaignContextBanner from "@/components/ActiveCampaignContextBanner";
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
@@ -20,6 +21,7 @@ import "./opportunity-flags.css";
 import "./visual-card-collapse.css";
 import "./schedule-preflight.css";
 import "./dashboard-restore.css";
+import "./campaign-selection.css";
 
 export const metadata:Metadata={
   title:"LMG Marketing Intelligence",
@@ -27,5 +29,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignWooCommerceDefaults/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
