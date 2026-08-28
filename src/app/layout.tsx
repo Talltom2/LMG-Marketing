@@ -10,6 +10,7 @@ import ActiveCampaignContextBanner from "@/components/ActiveCampaignContextBanne
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
 import CampaignVisualLibraryOrganizer from "@/components/CampaignVisualLibraryOrganizer";
+import CampaignVisualApprovalPersistence from "@/components/CampaignVisualApprovalPersistence";
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
@@ -32,5 +33,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
