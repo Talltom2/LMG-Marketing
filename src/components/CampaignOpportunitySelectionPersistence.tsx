@@ -33,69 +33,93 @@ export default function CampaignOpportunitySelectionPersistence(){
 
     const persist=async(value:Record<string,string[]>)=>{
       const normalized=Object.fromEntries(Object.entries(value).map(([channel,ids])=>[channel,Array.from(new Set(ids)).sort()]));
-      // Browser state changes immediately, before any network round trip.
       write(ctx,normalized);const signature=JSON.stringify(normalized);if(signature===last.current)return;
       if(!campaignId){last.current=signature;return}
       try{const r=await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/builder-state`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({state:{opportunities:normalized,opportunityLabels:labelsFor(normalized)}})});if(r.ok)last.current=signature}catch{}
     };
 
-    const apply=(saved:Record<string,string[]>)=>{restoring.current=true;try{document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel||!Object.prototype.hasOwnProperty.call(saved,channel))return;const wanted=new Set(saved[channel]);card.querySelectorAll<HTMLElement>(".opportunity-option").forEach(option=>{const oid=opportunityId(channel,cleanLabel(text(option.querySelector("strong")))),box=option.querySelector<HTMLInputElement>('input[type="checkbox"]');if(oid&&box&&box.checked!==wanted.has(oid))box.click()})})}finally{restoring.current=false}};
+    const apply=(saved:Record<string,string[]>)=>{
+      restoring.current=true;
+      try{
+        document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{
+          const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];
+          if(!channel||!Object.prototype.hasOwnProperty.call(saved,channel))return;
+          const wanted=new Set(saved[channel]);
+          card.querySelectorAll<HTMLElement>(".opportunity-option").forEach(option=>{
+            const oid=opportunityId(channel,cleanLabel(text(option.querySelector("strong")))),box=option.querySelector<HTMLInputElement>('input[type="checkbox"]');
+            if(oid&&box&&box.checked!==wanted.has(oid))box.click();
+          });
+        });
+      }finally{restoring.current=false}
+    };
 
-    // Restore once when this campaign/draft context loads. After this point the
-    // user's React interactions own the controls; persistence follows them.
     const restore=async()=>{
       let saved=read(ctx);
-      if(campaignId){try{const r=await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/builder-state`,{cache:"no-store"});if(r.ok){const d=await r.json() as {state?:{opportunities?:Record<string,string[]>;opportunityLabels?:Record<string,string[]>}};if(d.state?.opportunities&&typeof d.state.opportunities==="object")saved=d.state.opportunities;else if(d.state?.opportunityLabels)saved=Object.fromEntries(Object.entries(d.state.opportunityLabels).map(([channel,labels])=>[channel,labels.map(label=>opportunityId(channel,label)).filter(Boolean) as string[]]))}}catch{}}
-      if(cancelled||interacted.current)return;write(ctx,saved);last.current=JSON.stringify(Object.fromEntries(Object.entries(saved).map(([channel,ids])=>[channel,Array.from(new Set(ids)).sort()])));apply(saved);
+      if(campaignId){
+        try{
+          const r=await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/builder-state`,{cache:"no-store"});
+          if(r.ok){
+            const d=await r.json() as {state?:{opportunities?:Record<string,string[]>;opportunityLabels?:Record<string,string[]>}};
+            if(d.state?.opportunities&&typeof d.state.opportunities==="object")saved=d.state.opportunities;
+            else if(d.state?.opportunityLabels)saved=Object.fromEntries(Object.entries(d.state.opportunityLabels).map(([channel,labels])=>[channel,labels.map(label=>opportunityId(channel,label)).filter(Boolean) as string[]]));
+          }
+        }catch{}
+      }
+      if(cancelled||interacted.current)return;
+      write(ctx,saved);
+      last.current=JSON.stringify(Object.fromEntries(Object.entries(saved).map(([channel,ids])=>[channel,Array.from(new Set(ids)).sort()])));
+      apply(saved);
     };
     void restore();
+
+    const saveCardAfterReact=(card:HTMLElement,delay=0)=>{
+      interacted.current=true;
+      window.setTimeout(()=>{
+        if(cancelled||restoring.current)return;
+        const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
+        const parent=card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]');
+        const current={...read(ctx)};
+        if(parent?.checked)current[channel]=visibleIds(card,channel);else delete current[channel];
+        void persist(current);
+      },delay);
+    };
+
+    const onChange=(event:Event)=>{
+      if(restoring.current)return;
+      const target=event.target as HTMLElement|null;if(!target)return;
+      const card=target.closest<HTMLElement>("#channels .opportunity-channel-card");if(!card)return;
+      if(target.matches('.opportunity-option input[type="checkbox"]')){saveCardAfterReact(card,0);return;}
+      if(target.matches('.asset-select input[type="checkbox"]')){saveCardAfterReact(card,30);}
+    };
 
     const onClick=(event:MouseEvent)=>{
       if(restoring.current)return;
       const target=event.target as HTMLElement|null;if(!target)return;
-
       const template=target.closest<HTMLElement>(".template-card");
-      if(template){const name=text(template.querySelector("strong")),t=campaignTemplates.find(x=>x.name===name);if(t){interacted.current=true;const next=Object.fromEntries(t.recommendedAssets.map(channel=>[channel,recommendedOpportunityIdsFor(channel,t.id)]));void persist(next)}return}
-
+      if(template){
+        const name=text(template.querySelector("strong")),t=campaignTemplates.find(x=>x.name===name);
+        if(t){interacted.current=true;const next=Object.fromEntries(t.recommendedAssets.map(channel=>[channel,recommendedOpportunityIdsFor(channel,t.id)]));void persist(next)}
+        return;
+      }
       const card=target.closest<HTMLElement>("#channels .opportunity-channel-card");if(!card)return;
-      const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
-
-      // When a collapsed active card is expanded its opportunity rows are
-      // remounted. Reapply saved state only for that explicit expand action.
       const collapseButton=target.closest<HTMLButtonElement>('button[aria-label*="opportunities"]');
       if(collapseButton){
         const expanding=collapseButton.getAttribute("aria-expanded")==="false";
-        if(expanding)window.setTimeout(()=>{if(!cancelled&&!interacted.current)apply(read(ctx));else if(!cancelled)apply(read(ctx))},60);
+        if(expanding)window.setTimeout(()=>{if(!cancelled)apply(read(ctx))},80);
         return;
       }
-
       const reset=target.closest<HTMLButtonElement>(".button-muted");
-      if(reset&&/AI recommendations/i.test(text(reset))){interacted.current=true;const current={...read(ctx),[channel]:recommendedOpportunityIdsFor(channel,currentTemplateId())};void persist(current);return}
-
-      const opportunityBox=target.closest<HTMLInputElement>('.opportunity-option input[type="checkbox"]');
-      if(opportunityBox){
-        const option=opportunityBox.closest<HTMLElement>(".opportunity-option"),oid=option?opportunityId(channel,cleanLabel(text(option.querySelector("strong")))):undefined;if(!oid)return;
+      if(reset&&/AI recommendations/i.test(text(reset))){
+        const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
         interacted.current=true;
-        const current={...read(ctx)};
-        if(!Object.prototype.hasOwnProperty.call(current,channel))current[channel]=visibleIds(card,channel);
-        const ids=new Set(current[channel]??[]),nextChecked=!opportunityBox.checked;
-        if(nextChecked)ids.add(oid);else ids.delete(oid);
-        current[channel]=Array.from(ids);
-        void persist(current);
-        return;
-      }
-
-      const assetBox=target.closest<HTMLInputElement>('.asset-select input[type="checkbox"]');
-      if(assetBox){
-        interacted.current=true;
-        const current={...read(ctx)},nextActive=!assetBox.checked;
-        if(nextActive)current[channel]=recommendedOpportunityIdsFor(channel,currentTemplateId());else delete current[channel];
+        const current={...read(ctx),[channel]:recommendedOpportunityIdsFor(channel,currentTemplateId())};
         void persist(current);
       }
     };
 
-    document.addEventListener("click",onClick,true);
-    return()=>{cancelled=true;document.removeEventListener("click",onClick,true)};
+    document.addEventListener("change",onChange,true);
+    document.addEventListener("click",onClick,false);
+    return()=>{cancelled=true;document.removeEventListener("change",onChange,true);document.removeEventListener("click",onClick,false)};
   },[ctx]);
   return null;
 }
