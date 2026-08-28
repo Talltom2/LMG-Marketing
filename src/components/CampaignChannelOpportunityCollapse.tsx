@@ -3,6 +3,7 @@
 import {useEffect} from "react";
 
 const STORAGE_KEY="lmg-campaign-channel-opportunity-collapse-v1";
+const OLD_ITEM_KEY="lmg-campaign-opportunity-collapse-v2";
 type SavedState=Record<string,boolean>;
 
 function readState():SavedState{try{return JSON.parse(localStorage.getItem(STORAGE_KEY)??"{}") as SavedState}catch{return{}}}
@@ -34,10 +35,14 @@ function apply(card:HTMLElement,collapsed:boolean){
 export default function CampaignChannelOpportunityCollapse(){
  useEffect(()=>{
   if(location.pathname!=="/campaigns")return;
+  try{localStorage.removeItem(OLD_ITEM_KEY)}catch{}
   let frame=0;
   const enhance=()=>{
    cancelAnimationFrame(frame);
    frame=requestAnimationFrame(()=>{
+    for(const oldButton of Array.from(document.querySelectorAll<HTMLButtonElement>("#channels .opportunity-option .lmg-opportunity-toggle"))){
+     if(/Expand/i.test(oldButton.textContent??""))oldButton.click();
+    }
     const saved=readState();
     for(const card of Array.from(document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card"))){
      const layer=card.querySelector<HTMLElement>(".opportunity-layer");
