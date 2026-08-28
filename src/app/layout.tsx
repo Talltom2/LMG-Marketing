@@ -9,6 +9,7 @@ import CampaignSelectionHighlighter from "@/components/CampaignSelectionHighligh
 import ActiveCampaignContextBanner from "@/components/ActiveCampaignContextBanner";
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
+import CampaignVisualLibraryOrganizer from "@/components/CampaignVisualLibraryOrganizer";
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
@@ -20,6 +21,7 @@ import "./site-additions.css";
 import "./nav-bridge.css";
 import "./opportunity-flags.css";
 import "./visual-card-collapse.css";
+import "./visual-library-organizer.css";
 import "./schedule-preflight.css";
 import "./dashboard-restore.css";
 import "./campaign-selection.css";
@@ -30,5 +32,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
