@@ -9,6 +9,8 @@ import CampaignDraftPersistence from "@/components/CampaignDraftPersistence";
 import CampaignSelectionHighlighter from "@/components/CampaignSelectionHighlighter";
 import ActiveCampaignContextBanner from "@/components/ActiveCampaignContextBanner";
 import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuard";
+import CampaignExecutionInstanceBridge from "@/components/CampaignExecutionInstanceBridge";
+import CampaignSchedulePersistence from "@/components/CampaignSchedulePersistence";
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
 import CampaignGeneratedVisualPersistence from "@/components/CampaignGeneratedVisualPersistence";
 import CampaignVisualLibraryOrganizer from "@/components/CampaignVisualLibraryOrganizer";
@@ -16,6 +18,7 @@ import CampaignVisualApprovalPersistence from "@/components/CampaignVisualApprov
 import CampaignOpportunitySelectionPersistence from "@/components/CampaignOpportunitySelectionPersistence";
 import CampaignApprovedVisualPicker from "@/components/CampaignApprovedVisualPicker";
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
+import CampaignCreativeReviewPersistence from "@/components/CampaignCreativeReviewPersistence";
 import CampaignBuilderSafeEnhancements from "@/components/CampaignBuilderSafeEnhancements";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
 import CampaignExecutionReadyLink from "@/components/CampaignExecutionReadyLink";
@@ -38,5 +41,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignBlankSessionGuard/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignGeneratedVisualPersistence/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunitySelectionPersistence/><CampaignApprovedVisualPicker/><CampaignOpportunityApprovalGuard/><CampaignBuilderSafeEnhancements/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignBlankSessionGuard/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignExecutionInstanceBridge/><CampaignSchedulePersistence/><CampaignVisualProductionBridge/><CampaignGeneratedVisualPersistence/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunitySelectionPersistence/><CampaignApprovedVisualPicker/><CampaignOpportunityApprovalGuard/><CampaignCreativeReviewPersistence/><CampaignBuilderSafeEnhancements/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
