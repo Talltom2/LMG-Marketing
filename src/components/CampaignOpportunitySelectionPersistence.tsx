@@ -33,8 +33,7 @@ export default function CampaignOpportunitySelectionPersistence(){
 
     const persist=async(value:Record<string,string[]>)=>{
       const normalized=Object.fromEntries(Object.entries(value).map(([channel,ids])=>[channel,Array.from(new Set(ids)).sort()]));
-      // Write browser state immediately. Any later restore pass now sees the user's
-      // newest check/uncheck choice instead of re-applying the previous value.
+      // Browser state changes immediately, before any network round trip.
       write(ctx,normalized);const signature=JSON.stringify(normalized);if(signature===last.current)return;
       if(!campaignId){last.current=signature;return}
       try{const r=await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/builder-state`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({state:{opportunities:normalized,opportunityLabels:labelsFor(normalized)}})});if(r.ok)last.current=signature}catch{}
@@ -42,6 +41,8 @@ export default function CampaignOpportunitySelectionPersistence(){
 
     const apply=(saved:Record<string,string[]>)=>{restoring.current=true;try{document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card").forEach(card=>{const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel||!Object.prototype.hasOwnProperty.call(saved,channel))return;const wanted=new Set(saved[channel]);card.querySelectorAll<HTMLElement>(".opportunity-option").forEach(option=>{const oid=opportunityId(channel,cleanLabel(text(option.querySelector("strong")))),box=option.querySelector<HTMLInputElement>('input[type="checkbox"]');if(oid&&box&&box.checked!==wanted.has(oid))box.click()})})}finally{restoring.current=false}};
 
+    // Restore once when this campaign/draft context loads. After this point the
+    // user's React interactions own the controls; persistence follows them.
     const restore=async()=>{
       let saved=read(ctx);
       if(campaignId){try{const r=await fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/builder-state`,{cache:"no-store"});if(r.ok){const d=await r.json() as {state?:{opportunities?:Record<string,string[]>;opportunityLabels?:Record<string,string[]>}};if(d.state?.opportunities&&typeof d.state.opportunities==="object")saved=d.state.opportunities;else if(d.state?.opportunityLabels)saved=Object.fromEntries(Object.entries(d.state.opportunityLabels).map(([channel,labels])=>[channel,labels.map(label=>opportunityId(channel,label)).filter(Boolean) as string[]]))}}catch{}}
@@ -58,6 +59,15 @@ export default function CampaignOpportunitySelectionPersistence(){
 
       const card=target.closest<HTMLElement>("#channels .opportunity-channel-card");if(!card)return;
       const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
+
+      // When a collapsed active card is expanded its opportunity rows are
+      // remounted. Reapply saved state only for that explicit expand action.
+      const collapseButton=target.closest<HTMLButtonElement>('button[aria-label*="opportunities"]');
+      if(collapseButton){
+        const expanding=collapseButton.getAttribute("aria-expanded")==="false";
+        if(expanding)window.setTimeout(()=>{if(!cancelled&&!interacted.current)apply(read(ctx));else if(!cancelled)apply(read(ctx))},60);
+        return;
+      }
 
       const reset=target.closest<HTMLButtonElement>(".button-muted");
       if(reset&&/AI recommendations/i.test(text(reset))){interacted.current=true;const current={...read(ctx),[channel]:recommendedOpportunityIdsFor(channel,currentTemplateId())};void persist(current);return}
@@ -84,12 +94,8 @@ export default function CampaignOpportunitySelectionPersistence(){
       }
     };
 
-    // The interval only restores cards that re-enter the DOM after a collapse/
-    // expand. It never owns the user's click; local storage is updated first.
-    const keepVisibleInSync=()=>{if(!restoring.current)apply(read(ctx))};
     document.addEventListener("click",onClick,true);
-    const interval=window.setInterval(keepVisibleInSync,800);
-    return()=>{cancelled=true;window.clearInterval(interval);document.removeEventListener("click",onClick,true)};
+    return()=>{cancelled=true;document.removeEventListener("click",onClick,true)};
   },[ctx]);
   return null;
 }
