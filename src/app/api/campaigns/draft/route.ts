@@ -36,13 +36,18 @@ export async function POST(request:NextRequest){
     const endDate=parseDate(body.endDate,defaultEnd);
     if(endDate<startDate)return NextResponse.json({error:"Campaign end date must be on or after the start date."},{status:400});
 
+    const existing=campaignId?await db.campaign.findUnique({where:{id:campaignId}}):null;
+    if(existing&&(existing.status===CampaignStatus.PLANNED||existing.status===CampaignStatus.ACTIVE)){
+      return NextResponse.json({error:"Planned and active campaigns are protected from draft autosave. Use an explicit campaign update workflow instead."},{status:409});
+    }
+
     const productSkus=Array.isArray(state.productSkus)?state.productSkus.map(String).map(s=>s.trim()).filter(Boolean):[];
     let products=productSkus.length?await db.product.findMany({where:{sku:{in:productSkus},active:true}}):[];
     if(productSkus.length&&products.length<productSkus.length){
       const website=await getWebsiteProductHealth();
       const bySku=new Map(website.products.filter(p=>String(p.sku??"").trim()).map(p=>[String(p.sku).trim(),p]));
-      const existing=new Set(products.map(p=>p.sku));
-      for(const sku of productSkus.filter(s=>!existing.has(s))){
+      const existingSkus=new Set(products.map(p=>p.sku));
+      for(const sku of productSkus.filter(s=>!existingSkus.has(s))){
         const p=bySku.get(sku); if(!p)continue;
         await db.product.upsert({where:{sku},update:{name:p.name,active:true},create:{sku,name:p.name,active:true}});
       }
@@ -50,7 +55,6 @@ export async function POST(request:NextRequest){
     }
 
     const theme=STATE_PREFIX+JSON.stringify(state);
-    const existing=campaignId?await db.campaign.findUnique({where:{id:campaignId}}):null;
     const campaign=await db.$transaction(async tx=>{
       const saved=existing
         ?await tx.campaign.update({where:{id:campaignId},data:{name,objective:objective||null,startDate,endDate,theme,status:existing.status===CampaignStatus.ACTIVE?CampaignStatus.ACTIVE:existing.status===CampaignStatus.PLANNED?CampaignStatus.PLANNED:CampaignStatus.DRAFT}})
