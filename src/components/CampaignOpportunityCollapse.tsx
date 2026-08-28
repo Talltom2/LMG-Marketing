@@ -14,10 +14,19 @@ function campaignKey(){
  const name=campaignLabel?.querySelector<HTMLInputElement>("input")?.value.trim();
  return (name||"builder-draft").toLowerCase();
 }
+function opportunityCards(){
+ const channels=document.querySelector<HTMLElement>("#channels");
+ if(!channels)return [] as HTMLElement[];
+ const explicit=Array.from(channels.querySelectorAll<HTMLElement>(".opportunity-option"));
+ if(explicit.length)return explicit;
+ return Array.from(channels.querySelectorAll<HTMLLabelElement>("label"))
+  .filter(label=>!label.classList.contains("asset-select")&&!!label.querySelector<HTMLInputElement>('input[type="checkbox"]')&&!!label.querySelector("strong"))
+  .map(label=>label as HTMLElement);
+}
 function optionKey(option:HTMLElement){
  const channel=option.closest<HTMLElement>(".opportunity-channel-card");
- const asset=text(channel?.querySelector(".asset-select strong"))||"channel";
- const label=text(option.querySelector("strong"))||"opportunity";
+ const asset=text(channel?.querySelector(".asset-select strong"))||text(channel?.querySelector("h3"))||"channel";
+ const label=text(option.querySelector("strong"))||text(option.querySelector("span"))||"opportunity";
  return `${campaignKey()}::${asset}::${label}`.toLowerCase();
 }
 function apply(option:HTMLElement,collapsed:boolean){
@@ -39,13 +48,16 @@ export default function CampaignOpportunityCollapse(){
    cancelAnimationFrame(frame);
    frame=requestAnimationFrame(()=>{
     const saved=readState();
-    for(const option of Array.from(document.querySelectorAll<HTMLElement>("#channels .opportunity-option"))){
+    for(const option of opportunityCards()){
+     option.classList.add("lmg-opportunity-collapsible");
      if(option.dataset.lmgOpportunityCollapseReady!=="1"){
       option.dataset.lmgOpportunityCollapseReady="1";
       const button=document.createElement("button");
       button.type="button";
       button.dataset.lmgOpportunityToggle="1";
       button.className="lmg-opportunity-toggle";
+      button.textContent="Collapse";
+      button.setAttribute("aria-label","Collapse opportunity details");
       button.addEventListener("click",event=>{
        event.preventDefault();
        event.stopPropagation();
@@ -55,14 +67,14 @@ export default function CampaignOpportunityCollapse(){
       option.appendChild(button);
      }
      const stored=saved[optionKey(option)];
-     if(typeof stored==="boolean")apply(option,stored);
-     else apply(option,false);
+     apply(option,typeof stored==="boolean"?stored:false);
     }
    });
   };
   enhance();
   const observer=new MutationObserver(enhance);observer.observe(document.body,{subtree:true,childList:true});
-  return()=>{observer.disconnect();cancelAnimationFrame(frame)};
+  document.addEventListener("change",enhance,true);
+  return()=>{observer.disconnect();document.removeEventListener("change",enhance,true);cancelAnimationFrame(frame)};
  },[]);
  return null;
 }
