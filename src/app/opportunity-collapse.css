@@ -4,4 +4,20 @@
 #channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed{max-height:56px!important;padding-bottom:8px!important}
 #channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed .lmg-opportunity-toggle{background:#f8fafc!important}
 #channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed p,#channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed small,#channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed .opportunity-description,#channels .lmg-opportunity-collapsible.lmg-opportunity-collapsed .opportunity-meta{visibility:hidden!important;opacity:0!important}
-@media(max-width:720px){#channels .lmg-opportunity-collapsible{padding-right:72px!important}#channels .lmg-opportunity-collapsible .lmg-opportunity-toggle{top:6px!important;right:6px!important;font-size:.68rem!important;padding:4px 7px!important;min-width:58px!important}}
+
+/* Step 2 uses the same numbered green-circle treatment as the later builder stages. */
+.campaign-workspace>.campaign-step-title{display:flex;align-items:center;gap:14px;margin:14px 0 12px;font-size:0;text-transform:none;color:#1c3e1d}
+.campaign-workspace>.campaign-step-title::before{content:"2";display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#2a702c;color:#fff;font-size:1rem;font-weight:800;line-height:1}
+.campaign-workspace>.campaign-step-title::after{content:"Products to Promote";font-size:clamp(1.55rem,2.6vw,2.15rem);font-weight:700;line-height:1.15;color:#1c3e1d}
+
+/* Unselected Step 3 asset cards are genuinely compact instead of blank full-height cards. */
+#channels .opportunity-channel-grid{align-items:start}
+#channels .opportunity-channel-card{transition:padding .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
+#channels .opportunity-channel-card:not(.selected){align-self:start;min-height:0!important;height:auto!important;padding:10px 14px!important;box-shadow:none!important;background:#fcfdf9!important}
+#channels .opportunity-channel-card:not(.selected)>p{display:none!important}
+#channels .opportunity-channel-card:not(.selected) .asset-select{margin:0!important;min-height:0!important;align-items:center}
+#channels .opportunity-channel-card:not(.selected) .asset-select>span{display:flex;align-items:baseline;gap:9px;min-width:0}
+#channels .opportunity-channel-card:not(.selected) .asset-select strong{line-height:1.2}
+#channels .opportunity-channel-card:not(.selected) .asset-select small{margin:0!important;font-size:.7rem;white-space:nowrap;opacity:.78}
+
+@media(max-width:720px){#channels .lmg-opportunity-collapsible{padding-right:72px!important}#channels .lmg-opportunity-collapsible .lmg-opportunity-toggle{top:6px!important;right:6px!important;font-size:.68rem!important;padding:4px 7px!important;min-width:58px!important}#channels .opportunity-channel-card:not(.selected) .asset-select>span{display:grid;gap:2px}#channels .opportunity-channel-card:not(.selected) .asset-select small{white-space:normal}}
