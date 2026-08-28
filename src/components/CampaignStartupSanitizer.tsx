@@ -7,11 +7,13 @@ const LEARNING_DRAFT_KEY="lmg-campaign-learning-draft-v1";
 const RESUME_KEY="lmg-campaign-exact-resume-v4";
 const ACTIVE_KEY="lmg-active-campaign-id";
 const SESSION_KEY="lmg-campaign-builder-session-v1";
+const BLANK_KEY="lmg-campaign-builder-blank-v1";
 
 /**
  * A new browser session starts with a blank campaign workspace. An explicit
- * campaign selection (RESUME_KEY) is honored, and an already-open campaign is
- * preserved on refresh/navigation during the same browser session.
+ * campaign selection is honored only when it was initiated in the current
+ * browser session. Refresh/navigation during that same session keeps the
+ * selected campaign open.
  */
 export default function CampaignStartupSanitizer(){
   const pathname=usePathname();
@@ -19,14 +21,18 @@ export default function CampaignStartupSanitizer(){
   useLayoutEffect(()=>{
     if(pathname!=="/campaigns")return;
     try{
-      const deliberateResume=!!localStorage.getItem(RESUME_KEY);
       const sameBrowserSession=sessionStorage.getItem(SESSION_KEY)==="1";
+      const deliberateResume=sameBrowserSession&&!!localStorage.getItem(RESUME_KEY);
       sessionStorage.setItem(SESSION_KEY,"1");
 
-      if(deliberateResume)return;
-      if(sameBrowserSession&&localStorage.getItem(ACTIVE_KEY))return;
+      if(deliberateResume){sessionStorage.removeItem(BLANK_KEY);return;}
+      if(sameBrowserSession&&localStorage.getItem(ACTIVE_KEY)){sessionStorage.removeItem(BLANK_KEY);return;}
 
+      // First builder visit of a new browser session: stale campaign pointers
+      // must not silently reopen yesterday's campaign.
       localStorage.removeItem(ACTIVE_KEY);
+      localStorage.removeItem(RESUME_KEY);
+      sessionStorage.setItem(BLANK_KEY,"1");
       localStorage.setItem(LEARNING_DRAFT_KEY,JSON.stringify({
         name:"",
         objective:"",
