@@ -72,24 +72,54 @@ export default function CampaignOpportunitySelectionPersistence(){
     };
     void restore();
 
-    const saveCardAfterReact=(card:HTMLElement,delay=0)=>{
+    const saveOpportunityAfterReact=(card:HTMLElement)=>{
       interacted.current=true;
       window.setTimeout(()=>{
         if(cancelled||restoring.current)return;
         const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
         const parent=card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]');
-        const current={...read(ctx)};
-        if(parent?.checked)current[channel]=visibleIds(card,channel);else delete current[channel];
+        if(!parent?.checked)return;
+        const current={...read(ctx),[channel]:visibleIds(card,channel)};
         void persist(current);
-      },delay);
+      },0);
+    };
+
+    const handleParentAfterReact=(card:HTMLElement)=>{
+      interacted.current=true;
+      const asset=text(card.querySelector(".asset-select strong")),channel=assetToChannel[asset];if(!channel)return;
+      const before=read(ctx);
+      const hadSavedChoices=Object.prototype.hasOwnProperty.call(before,channel);
+      const savedChoices=hadSavedChoices?[...(before[channel]??[])]:null;
+
+      window.setTimeout(()=>{
+        if(cancelled||restoring.current)return;
+        const parent=card.querySelector<HTMLInputElement>('.asset-select input[type="checkbox"]');
+        if(!parent?.checked){
+          // Disabling a channel must not erase its child opportunity choices.
+          // The channel's active/inactive state is persisted separately.
+          return;
+        }
+
+        if(savedChoices!==null){
+          // Re-enabling restores the exact child choices from before the channel
+          // was disabled, including an intentionally empty selection.
+          apply({[channel]:savedChoices});
+          return;
+        }
+
+        // First activation of a channel has no prior child state, so accept the
+        // native/default recommendations once and remember that selection.
+        const current={...read(ctx),[channel]:visibleIds(card,channel)};
+        void persist(current);
+      },50);
     };
 
     const onChange=(event:Event)=>{
       if(restoring.current)return;
       const target=event.target as HTMLElement|null;if(!target)return;
       const card=target.closest<HTMLElement>("#channels .opportunity-channel-card");if(!card)return;
-      if(target.matches('.opportunity-option input[type="checkbox"]')){saveCardAfterReact(card,0);return;}
-      if(target.matches('.asset-select input[type="checkbox"]')){saveCardAfterReact(card,30);}
+      if(target.matches('.opportunity-option input[type="checkbox"]')){saveOpportunityAfterReact(card);return;}
+      if(target.matches('.asset-select input[type="checkbox"]')){handleParentAfterReact(card);}
     };
 
     const onClick=(event:MouseEvent)=>{
