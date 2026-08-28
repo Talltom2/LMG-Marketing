@@ -77,6 +77,7 @@ function visualChoices():VisualChoice[]{
 
 export default function CampaignCreativeReviewPersistence(){
   const pathname=usePathname();
+  const[id,setId]=useState("");
   const[target,setTarget]=useState<HTMLElement|null>(null);
   const[drafts,setDrafts]=useState<CreativeState[]>([]);
   const[restoreEnabled,setRestoreEnabled]=useState(false);
@@ -84,11 +85,19 @@ export default function CampaignCreativeReviewPersistence(){
   const[choices,setChoices]=useState<VisualChoice[]>([]);
   const saveTimer=useRef<number|undefined>(undefined);
   const lastSaved=useRef("");
+  const choiceSignature=useRef("");
+  const nativeAnnounced=useRef(false);
 
   useEffect(()=>{
     if(pathname!=="/campaigns")return;
-    const id=activeId();if(!id)return;
+    const sync=()=>setId(current=>{const next=activeId();return next===current?current:next});
+    sync();const watch=window.setInterval(sync,250);return()=>window.clearInterval(watch);
+  },[pathname]);
+
+  useEffect(()=>{
+    if(pathname!=="/campaigns"||!id)return;
     let cancelled=false,tries=0;
+    setDrafts([]);setRestoreEnabled(false);lastSaved.current="";nativeAnnounced.current=false;
 
     const place=()=>{
       const six=step6();if(!six){if(++tries<100)window.setTimeout(place,100);return}
@@ -110,21 +119,20 @@ export default function CampaignCreativeReviewPersistence(){
     void load();
 
     const watch=window.setInterval(()=>{
-      const native=nativeSection();
-      setHasNative(!!native);
-      setChoices(visualChoices());
+      const native=nativeSection(),present=!!native;
+      setHasNative(current=>current===present?current:present);
+      const nextChoices=visualChoices(),sig=JSON.stringify(nextChoices);
+      if(sig!==choiceSignature.current){choiceSignature.current=sig;setChoices(nextChoices)}
       if(native&&native.querySelectorAll("article.creative-card").length){
-        const current=capture(native),signature=JSON.stringify(current);
-        if(!lastSaved.current){lastSaved.current=signature;setDrafts(current)}
-      }
-    },500);
+        if(!nativeAnnounced.current){nativeAnnounced.current=true;document.dispatchEvent(new Event("lmg-creative-review-ready"))}
+      }else nativeAnnounced.current=false;
+    },400);
 
     return()=>{cancelled=true;window.clearInterval(watch)};
-  },[pathname]);
+  },[pathname,id]);
 
   useEffect(()=>{
-    if(pathname!=="/campaigns")return;
-    const id=activeId();if(!id)return;
+    if(pathname!=="/campaigns"||!id)return;
 
     const persist=async(section:HTMLElement)=>{
       const current=capture(section),signature=JSON.stringify(current);if(!current.length||signature===lastSaved.current)return;
@@ -135,20 +143,22 @@ export default function CampaignCreativeReviewPersistence(){
     };
 
     const schedule=(event:Event)=>{
-      const section=(event.target as HTMLElement|null)?.closest<HTMLElement>("#creative-approval")??creativeSection();if(!section)return;
+      const targetElement=event.target as HTMLElement|null;
+      const section=event.type==="lmg-creative-review-ready"?nativeSection():(targetElement?.closest<HTMLElement>("#creative-approval")??null);
+      if(!section)return;
       if(saveTimer.current)window.clearTimeout(saveTimer.current);
       saveTimer.current=window.setTimeout(()=>void persist(section),300);
     };
-    document.addEventListener("input",schedule,true);document.addEventListener("change",schedule,true);document.addEventListener("click",schedule,true);
-    return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current);document.removeEventListener("input",schedule,true);document.removeEventListener("change",schedule,true);document.removeEventListener("click",schedule,true)};
-  },[pathname]);
+    document.addEventListener("input",schedule,true);document.addEventListener("change",schedule,true);document.addEventListener("click",schedule,true);document.addEventListener("lmg-creative-review-ready",schedule as EventListener,true);
+    return()=>{if(saveTimer.current)window.clearTimeout(saveTimer.current);document.removeEventListener("input",schedule,true);document.removeEventListener("change",schedule,true);document.removeEventListener("click",schedule,true);document.removeEventListener("lmg-creative-review-ready",schedule as EventListener,true)};
+  },[pathname,id]);
 
   const choiceByLabel=useMemo(()=>new Map(choices.map(c=>[c.label,c])),[choices]);
 
-  function update(id:string,patch:Partial<CreativeState>){setDrafts(current=>current.map(d=>d.id===id?{...d,...patch}:d))}
-  function regenerate(id:string){setDrafts(current=>current.map(d=>d.id===id?{...d,version:d.version+1,status:"REVIEW",body:d.comment?`${d.body}\n\nRequested revision: ${d.comment}`:d.body,comment:""}:d))}
+  function update(draftId:string,patch:Partial<CreativeState>){setDrafts(current=>current.map(d=>d.id===draftId?{...d,...patch}:d))}
+  function regenerate(draftId:string){setDrafts(current=>current.map(d=>d.id===draftId?{...d,version:d.version+1,status:"REVIEW",body:d.comment?`${d.body}\n\nRequested revision: ${d.comment}`:d.body,comment:""}:d))}
 
-  if(pathname!=="/campaigns"||!target||hasNative||!restoreEnabled||!drafts.length)return null;
+  if(pathname!=="/campaigns"||!id||!target||hasNative||!restoreEnabled||!drafts.length)return null;
 
   return createPortal(<section id="creative-approval" data-lmg-restored-creative="1" className="campaign-stage-panel creative-approval-panel"><div className="stage-heading"><span>7</span><div><p className="eyebrow">Creative approval · Restored saved review</p><h2>Review visual + copy and authorize each opportunity creative</h2></div></div><p className="approval-note">This creative review was restored from the campaign's persistent builder state. Edits, approvals, exclusions, image choices and budgets continue to autosave.</p><div className="creative-card-grid">{drafts.map(d=>{const selectedLabel=d.visualLabel||d.visualValue,choice=choiceByLabel.get(selectedLabel);return <article className={`creative-card status-${d.status.toLowerCase()}`} key={d.id}><div className="creative-card-head"><div><span className="eyebrow">{d.channel}</span><h3>{d.opportunity}</h3></div><span className="creative-version">v{d.version} · {d.status}</span></div>{choice?.url?<div className="creative-preview"><img src={choice.url} alt={choice.label} style={{width:"100%",height:"auto",borderRadius:12}}/></div>:<div className="creative-preview"><strong>{selectedLabel?"Saved campaign visual":"No visual selected yet"}</strong><p>{selectedLabel||"Choose an approved asset from the Campaign Visual Library."}</p></div>}<div className="creative-preview"><strong>{d.headline}</strong><p>{d.body}</p><button type="button">{d.cta}</button></div><p className="creative-spec"><strong>Format:</strong> {d.format||"Campaign-ready creative"}</p><label>Campaign visual<select value={selectedLabel} onChange={e=>update(d.id,{visualValue:e.target.value,visualLabel:e.target.value,status:"REVIEW"})}><option value="">Choose visual</option>{choices.map(v=><option value={v.label} key={v.label}>{v.label} · APPROVED</option>)}</select></label>{d.isPaid?<div className="budget-authorization"><label><strong>Approved opportunity budget</strong><span className="budget-input"><b>$</b><input type="number" min="0" step="1" value={d.budget||""} onChange={e=>update(d.id,{budget:Number(e.target.value),status:"REVIEW"})} placeholder="Enter budget"/></span></label><small>Approving this opportunity authorizes spend up to this amount on {d.channel}.</small></div>:<div className="publication-authorization"><strong>Publication authorization</strong><small>Approving this creative authorizes LMG Marketing to schedule and publish this specific opportunity.</small></div>}<div className="creative-copy-edit"><label>Headline<input value={d.headline} onChange={e=>update(d.id,{headline:e.target.value,status:"REVIEW"})}/></label><label>CTA<input value={d.cta} onChange={e=>update(d.id,{cta:e.target.value,status:"REVIEW"})}/></label><label className="editor-wide">Body copy<textarea rows={4} value={d.body} onChange={e=>update(d.id,{body:e.target.value,status:"REVIEW"})}/></label></div><label className="revision-field">Request a specific change<textarea rows={3} value={d.comment} onChange={e=>update(d.id,{comment:e.target.value})}/></label><div className="creative-actions"><button type="button" className="primary-button" disabled={(d.isPaid&&d.budget<=0)||!selectedLabel} onClick={()=>update(d.id,{status:"APPROVED"})}>{d.isPaid?`Approve Visual + Copy & Authorize $${d.budget.toFixed(0)} Spend`:"Approve Visual + Copy & Authorize Publication"}</button><button type="button" className="button-outline" onClick={()=>regenerate(d.id)}>Regenerate Copy with Changes</button><button type="button" className="button-muted" onClick={()=>update(d.id,{status:"EXCLUDED"})}>Exclude</button></div>{!selectedLabel&&<p className="gate-blocker">Choose a campaign visual before final approval.</p>}{d.isPaid&&d.budget<=0&&<p className="gate-blocker">Enter the paid-media budget to activate approval.</p>}{d.status==="APPROVED"&&<p className="status-message"><strong>✓ Visual + copy authorized for scheduling{d.isPaid?` and up to $${d.budget.toFixed(2)} in spend`:" and publication"}.</strong></p>}</article>})}</div><div className="creative-summary"><strong>{drafts.filter(d=>d.status==="APPROVED").length} authorized</strong><span>{drafts.filter(d=>d.status==="REVIEW").length} awaiting review</span><span>{drafts.filter(d=>d.status==="EXCLUDED").length} excluded</span><span>Total paid-media authorization: ${drafts.filter(d=>d.status==="APPROVED"&&d.isPaid).reduce((sum,d)=>sum+d.budget,0).toFixed(2)}</span></div><button className="primary-button" disabled={!drafts.some(d=>d.status==="APPROVED")||drafts.some(d=>d.status==="REVIEW")}>Continue to Step 8 · Schedule Authorized Opportunities</button></section>,target);
 }
