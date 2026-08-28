@@ -18,14 +18,11 @@ function channelKey(card:HTMLElement){
 }
 function apply(card:HTMLElement,collapsed:boolean){
  const layer=card.querySelector<HTMLElement>(".opportunity-layer");
- const heading=layer?.querySelector<HTMLElement>(".opportunity-layer-heading");
- const list=layer?.querySelector<HTMLElement>(".opportunity-list");
- const blocker=layer?.querySelector<HTMLElement>(".gate-blocker");
- const button=heading?.querySelector<HTMLButtonElement>("[data-lmg-channel-collapse='1']");
- if(!layer||!heading||!list||!button)return;
- list.hidden=collapsed;
- if(blocker)blocker.hidden=collapsed;
- layer.classList.toggle("lmg-channel-opportunities-collapsed",collapsed);
+ const button=card.querySelector<HTMLButtonElement>("[data-lmg-channel-collapse='1']");
+ if(!layer||!button)return;
+ for(const child of Array.from(layer.children) as HTMLElement[])child.hidden=collapsed;
+ card.classList.toggle("lmg-channel-opportunities-collapsed",collapsed);
+ layer.classList.toggle("lmg-channel-opportunities-collapsed-layer",collapsed);
  button.textContent=collapsed?"⌄":"⌃";
  button.setAttribute("aria-expanded",collapsed?"false":"true");
  button.setAttribute("aria-label",collapsed?"Expand opportunities":"Collapse opportunities");
@@ -40,24 +37,20 @@ export default function CampaignChannelOpportunityCollapse(){
   const enhance=()=>{
    cancelAnimationFrame(frame);
    frame=requestAnimationFrame(()=>{
-    for(const oldButton of Array.from(document.querySelectorAll<HTMLButtonElement>("#channels .opportunity-option .lmg-opportunity-toggle"))){
-     if(/Expand/i.test(oldButton.textContent??""))oldButton.click();
-    }
     const saved=readState();
     for(const card of Array.from(document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card"))){
      const layer=card.querySelector<HTMLElement>(".opportunity-layer");
-     const heading=layer?.querySelector<HTMLElement>(".opportunity-layer-heading");
-     if(!layer||!heading)continue;
-     let button=heading.querySelector<HTMLButtonElement>("[data-lmg-channel-collapse='1']");
+     if(!layer)continue;
+     let button=card.querySelector<HTMLButtonElement>("[data-lmg-channel-collapse='1']");
      if(!button){
       button=document.createElement("button");
       button.type="button";
       button.dataset.lmgChannelCollapse="1";
       button.className="lmg-channel-collapse-toggle";
-      heading.appendChild(button);
+      card.appendChild(button);
       button.addEventListener("click",event=>{
        event.preventDefault();event.stopPropagation();
-       const next=!layer.classList.contains("lmg-channel-opportunities-collapsed");
+       const next=!card.classList.contains("lmg-channel-opportunities-collapsed");
        const all=readState();all[channelKey(card)]=next;writeState(all);apply(card,next);
       });
      }
