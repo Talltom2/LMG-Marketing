@@ -6,9 +6,22 @@ function normalizeUrl(value:string){
   try{
     const u=new URL(value,location.origin);
     u.hash="";
-    ["ver","version","cache","cb","_"].forEach(k=>u.searchParams.delete(k));
-    return u.toString().replace(/\/$/,"");
-  }catch{return value.trim();}
+    u.protocol="https:";
+    u.hostname=u.hostname.toLowerCase().replace(/^www\./,"");
+    const path=decodeURIComponent(u.pathname)
+      .replace(/-\d+x\d+(?=\.[a-z0-9]+$)/i,"")
+      .replace(/-scaled(?=\.[a-z0-9]+$)/i,"")
+      .replace(/\/{2,}/g,"/")
+      .replace(/\/$/,"");
+    u.pathname=path;
+    u.search="";
+    return `${u.hostname}${u.pathname}`.toLowerCase();
+  }catch{
+    return value.trim().toLowerCase()
+      .replace(/[?#].*$/,"")
+      .replace(/-\d+x\d+(?=\.[a-z0-9]+$)/i,"")
+      .replace(/-scaled(?=\.[a-z0-9]+$)/i,"");
+  }
 }
 
 function cleanOptionLabel(value:string){
@@ -58,8 +71,13 @@ export default function CampaignVisualLibraryOrganizer(){
           card.classList.remove("lmg-visual-thumbnail","lmg-visual-selected","lmg-visual-brief","lmg-visual-duplicate");
           card.removeAttribute("aria-hidden");
           const img=card.querySelector<HTMLImageElement>(".creative-preview img");
+          const ai=(card.querySelector(".eyebrow")?.textContent??"").toLowerCase().includes("ai visual");
+          const approveButton=Array.from(card.querySelectorAll<HTMLButtonElement>("button")).find(b=>/Approve for Campaign|Approved/i.test(b.textContent??""));
+          if(ai&& !img?.src){
+            approveButton?.remove();
+          }
           if(!img?.src)continue;
-          const key=normalizeUrl(img.src);
+          const key=normalizeUrl(img.currentSrc||img.src);
           const score=scoreFor(card);
           const existing=bestByImage.get(key);
           if(!existing){bestByImage.set(key,{card,score});continue;}
@@ -105,7 +123,7 @@ export default function CampaignVisualLibraryOrganizer(){
 
     organize();
     const observer=new MutationObserver(organize);
-    observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["src","class","value"]});
+    observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["src","srcset","class","value"]});
     document.addEventListener("change",organize,true);
     document.addEventListener("click",organize,true);
     return()=>{observer.disconnect();document.removeEventListener("change",organize,true);document.removeEventListener("click",organize,true);cancelAnimationFrame(frame);};
