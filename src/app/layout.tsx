@@ -11,6 +11,7 @@ import CampaignCalendarWindowGuard from "@/components/CampaignCalendarWindowGuar
 import CampaignVisualProductionBridge from "@/components/CampaignVisualProductionBridge";
 import CampaignVisualLibraryOrganizer from "@/components/CampaignVisualLibraryOrganizer";
 import CampaignVisualApprovalPersistence from "@/components/CampaignVisualApprovalPersistence";
+import CampaignOpportunitySelectionPersistence from "@/components/CampaignOpportunitySelectionPersistence";
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
@@ -33,5 +34,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunitySelectionPersistence/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
