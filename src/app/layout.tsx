@@ -15,7 +15,6 @@ import CampaignOpportunitySelectionPersistence from "@/components/CampaignOpport
 import CampaignApprovedVisualPicker from "@/components/CampaignApprovedVisualPicker";
 import CampaignOpportunityApprovalGuard from "@/components/CampaignOpportunityApprovalGuard";
 import CampaignVisualCardCollapse from "@/components/CampaignVisualCardCollapse";
-import CampaignBuilderCardControls from "@/components/CampaignBuilderCardControls";
 import HomepageScheduleServerSync from "@/components/HomepageScheduleServerSync";
 import CampaignExecutionReadyLink from "@/components/CampaignExecutionReadyLink";
 import PinterestCampaignOpportunityBridge from "@/components/PinterestCampaignOpportunityBridge";
@@ -38,5 +37,5 @@ export const metadata:Metadata={
 };
 
 export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){
-  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunitySelectionPersistence/><CampaignApprovedVisualPicker/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><CampaignBuilderCardControls/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
+  return <html lang="en"><body><GlobalCampaignNav/><ActiveCampaignContextBanner/><PromotionalAssetsGlobalNav/><PromotionalAssetsNavInjector/><CampaignCollectionPromoteFeedback/><CampaignStartupSanitizer/><CampaignDraftPersistence/><CampaignSelectionHighlighter/><WooCommerceCampaignOpportunityBridge/><PinterestCampaignOpportunityBridge/><CampaignCalendarWindowGuard/><CampaignVisualProductionBridge/><CampaignVisualLibraryOrganizer/><CampaignVisualApprovalPersistence/><CampaignOpportunitySelectionPersistence/><CampaignApprovedVisualPicker/><CampaignOpportunityApprovalGuard/><CampaignVisualCardCollapse/><HomepageScheduleServerSync/><CampaignExecutionReadyLink/>{children}</body></html>;
 }
