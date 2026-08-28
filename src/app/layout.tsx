@@ -35,6 +35,7 @@ import "./opportunity-collapse.css";
 import "./schedule-preflight.css";
 import "./dashboard-restore.css";
 import "./campaign-selection.css";
+import "./campaign-startup.css";
 
 export const metadata:Metadata={
   title:"LMG Marketing Intelligence",
