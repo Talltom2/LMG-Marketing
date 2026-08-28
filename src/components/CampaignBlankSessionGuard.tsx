@@ -4,7 +4,7 @@ import {useEffect} from "react";
 import {usePathname} from "next/navigation";
 
 const ACTIVE_KEY="lmg-active-campaign-id";
-const LEARNING_DRAFT_KEY="lmg-campaign-learning-draft-v1";
+const BLANK_KEY="lmg-campaign-builder-blank-v1";
 
 function setReactValue(el:HTMLInputElement|HTMLTextAreaElement,value:string){
   const proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
@@ -19,13 +19,7 @@ export default function CampaignBlankSessionGuard(){
 
   useEffect(()=>{
     if(pathname!=="/campaigns")return;
-    let blank=false;
-    try{
-      if(localStorage.getItem(ACTIVE_KEY))return;
-      const raw=localStorage.getItem(LEARNING_DRAFT_KEY);
-      if(raw){const d=JSON.parse(raw) as {learningSummary?:string};blank=/Blank campaign/i.test(d.learningSummary??"")}
-    }catch{}
-    if(!blank)return;
+    try{if(localStorage.getItem(ACTIVE_KEY)||sessionStorage.getItem(BLANK_KEY)!=="1")return}catch{return}
 
     let tries=0,cancelled=false;
     const apply=()=>{
@@ -35,7 +29,7 @@ export default function CampaignBlankSessionGuard(){
       const channels=document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card");
       if(!step1||!rows.length||!channels.length){if(++tries<100)window.setTimeout(apply,100);return}
 
-      // Clear channels first so blank date/messaging values cannot feed a derived calendar.
+      // Clear default channel/product selections before clearing visible text.
       document.querySelectorAll<HTMLInputElement>('#channels .asset-select input[type="checkbox"]:checked').forEach(box=>box.click());
       document.querySelectorAll<HTMLInputElement>('.campaign-table tbody input[type="checkbox"]:checked').forEach(box=>box.click());
 
@@ -58,7 +52,7 @@ export default function CampaignBlankSessionGuard(){
       clearTemplateSelection();
       const timer=window.setInterval(clearTemplateSelection,150);
       window.setTimeout(()=>window.clearInterval(timer),1800);
-      const choose=(event:Event)=>{if((event.target as HTMLElement|null)?.closest(".template-card")){keepBlank=false;window.clearInterval(timer);document.removeEventListener("click",choose,true)}};
+      const choose=(event:Event)=>{if((event.target as HTMLElement|null)?.closest(".template-card")){keepBlank=false;sessionStorage.removeItem(BLANK_KEY);window.clearInterval(timer);document.removeEventListener("click",choose,true)}};
       document.addEventListener("click",choose,true);
     };
     apply();
