@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useRef} from "react";
+import {useEffect,useRef,useState} from "react";
 import {usePathname} from "next/navigation";
 
 const ACTIVE_KEY="lmg-active-campaign-id";
@@ -17,13 +17,19 @@ function forCampaign(id:string){const all=readAll(),out:ScheduleMap={};for(const
 
 export default function CampaignSchedulePersistence(){
   const pathname=usePathname();
+  const[id,setId]=useState("");
   const timer=useRef<number|undefined>(undefined);
   const last=useRef("");
 
   useEffect(()=>{
     if(pathname!=="/campaigns")return;
-    const id=activeId();if(!id)return;
-    let cancelled=false;
+    const sync=()=>setId(current=>{const next=activeId();return next===current?current:next});
+    sync();const watch=window.setInterval(sync,250);return()=>window.clearInterval(watch);
+  },[pathname]);
+
+  useEffect(()=>{
+    if(pathname!=="/campaigns"||!id)return;
+    let cancelled=false;last.current="";
 
     const restore=async()=>{
       try{
@@ -55,7 +61,7 @@ export default function CampaignSchedulePersistence(){
     document.addEventListener("change",schedule,true);
     document.addEventListener("input",schedule,true);
     return()=>{cancelled=true;if(timer.current)window.clearTimeout(timer.current);document.removeEventListener("click",schedule,true);document.removeEventListener("change",schedule,true);document.removeEventListener("input",schedule,true)};
-  },[pathname]);
+  },[pathname,id]);
 
   return null;
 }
