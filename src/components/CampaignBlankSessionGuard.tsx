@@ -29,7 +29,7 @@ export default function CampaignBlankSessionGuard(){
       const channels=document.querySelectorAll<HTMLElement>("#channels .opportunity-channel-card");
       if(!step1||!rows.length||!channels.length){if(++tries<100)window.setTimeout(apply,100);return}
 
-      // Clear default channel/product selections before clearing visible text.
+      // Clear default channel/product selections before clearing visible fields.
       document.querySelectorAll<HTMLInputElement>('#channels .asset-select input[type="checkbox"]:checked').forEach(box=>box.click());
       document.querySelectorAll<HTMLInputElement>('.campaign-table tbody input[type="checkbox"]:checked').forEach(box=>box.click());
 
@@ -44,6 +44,16 @@ export default function CampaignBlankSessionGuard(){
         messaging.querySelectorAll<HTMLInputElement>(".creative-editor input").forEach(input=>setReactValue(input,""));
         messaging.querySelectorAll<HTMLTextAreaElement>(".creative-editor textarea").forEach(area=>setReactValue(area,""));
       }
+
+      // Once React has applied the channel removals, blank the recommended dates
+      // too. Calendar derivation is safe because a blank campaign has no channels.
+      window.setTimeout(()=>{
+        if(cancelled)return;
+        const anyChannel=!!document.querySelector('#channels .asset-select input[type="checkbox"]:checked');
+        if(anyChannel)return;
+        const currentStep1=document.querySelector<HTMLElement>(".campaign-details-card");
+        currentStep1?.querySelectorAll<HTMLInputElement>('input[type="date"]').forEach(input=>setReactValue(input,""));
+      },120);
 
       // No template is visually preselected on a new blank campaign. The first
       // actual template click lets React take over normally.
