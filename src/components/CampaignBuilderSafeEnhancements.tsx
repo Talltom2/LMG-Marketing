@@ -24,7 +24,7 @@ function setReactValue(el:HTMLInputElement|HTMLTextAreaElement,value:string){
   el.dispatchEvent(new Event("input",{bubbles:true}));
   el.dispatchEvent(new Event("change",{bubbles:true}));
 }
-function channelFromTitle(title:string){
+function channelFromTitle(title:string):string{
   if(/^WooCommerce\s*·/i.test(title)||/^WooCommerce/i.test(title))return"WOOCOMMERCE";
   if(/Pinterest/i.test(title))return"PINTEREST";
   if(/TikTok/i.test(title))return"TIKTOK";
