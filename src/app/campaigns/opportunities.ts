@@ -66,5 +66,24 @@ export const opportunityCatalog:Record<string,PromotionalOpportunity[]>={
   ]
 };
 
-export function recommendedOpportunityIdsFor(channel:string,templateId:string){const options=opportunityCatalog[channel]??[];const recommended=options.filter(o=>o.recommendedFor?.includes(templateId)).map(o=>o.id);return recommended.length?recommended:[options[0]?.id].filter(Boolean) as string[];}
+const OPPORTUNITY_SELECTION_PREFIX="lmg-opportunity-selections-v1:";
+function persistedOpportunitySelection(channel:string){
+  if(typeof window==="undefined")return undefined;
+  try{
+    const campaignId=localStorage.getItem("lmg-active-campaign-id");
+    if(!campaignId)return undefined;
+    const raw=localStorage.getItem(`${OPPORTUNITY_SELECTION_PREFIX}${campaignId}`);
+    if(!raw)return undefined;
+    const saved=JSON.parse(raw) as Record<string,string[]>;
+    return Object.prototype.hasOwnProperty.call(saved,channel)?saved[channel]:undefined;
+  }catch{return undefined;}
+}
+
+export function recommendedOpportunityIdsFor(channel:string,templateId:string){
+  const persisted=persistedOpportunitySelection(channel);
+  if(persisted!==undefined)return persisted;
+  const options=opportunityCatalog[channel]??[];
+  const recommended=options.filter(o=>o.recommendedFor?.includes(templateId)).map(o=>o.id);
+  return recommended.length?recommended:[options[0]?.id].filter(Boolean) as string[];
+}
 export function opportunityFor(channel:string,id:string){return (opportunityCatalog[channel]??[]).find(o=>o.id===id)}
