@@ -1,7 +1,7 @@
 import {db} from "@/lib/db";
 import {fetchGa4DailyFunnel} from "@/lib/ga4";
 
-const LIVE_SOURCE="ga4:website-live";
+const LIVE_SOURCE="lmg-analytics:ga4-live";
 const SIX_HOURS=6*60*60*1000;
 const DAY=86400000;
 
