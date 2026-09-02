@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {db} from "@/lib/db";
+import {syncGa4FunnelIfStale} from "@/lib/sync-ga4-funnel";
 import DashboardAssistantBox from "@/components/DashboardAssistantBox";
 import FunnelTrendSection from "@/components/FunnelTrendSection";
 
@@ -8,6 +9,7 @@ function dateLabel(value:Date){return value.toLocaleDateString("en-US",{month:"s
 export const dynamic="force-dynamic";
 
 export default async function Home(){
+  await syncGa4FunnelIfStale().catch(()=>null);
   const endDate=new Date(); const startDate=new Date(endDate.getTime()-7*86400000); const priorStart=new Date(startDate.getTime()-7*86400000);
   const[metrics,priorMetrics,topProducts,channelTotals,allChannels,campaigns,syncRuns,funnelTotals]=await Promise.all([
     db.commerceMetric.findMany({where:{date:{gte:startDate,lte:endDate},OR:[{units:{gt:0}},{revenue:{gt:0}}]},select:{units:true,revenue:true}}),db.commerceMetric.findMany({where:{date:{gte:priorStart,lt:startDate},OR:[{units:{gt:0}},{revenue:{gt:0}}]},select:{units:true,revenue:true}}),db.commerceMetric.groupBy({by:["productId"],where:{date:{gte:startDate,lte:endDate}},_sum:{units:true,revenue:true},orderBy:{_sum:{revenue:"desc"}},take:5}),db.commerceMetric.groupBy({by:["channelId"],where:{date:{gte:startDate,lte:endDate}},_sum:{units:true,revenue:true},orderBy:{_sum:{revenue:"desc"}}}),db.channel.findMany({select:{id:true,type:true,name:true,active:true}}),db.campaign.findMany({where:{status:{in:["PLANNED","ACTIVE","PAUSED"]}},select:{id:true,name:true,status:true,startDate:true,endDate:true},orderBy:{startDate:"asc"},take:8}),db.syncRun.findMany({orderBy:{startedAt:"desc"},take:12}),db.funnelMetric.aggregate({where:{date:{gte:startDate,lte:endDate},source:{startsWith:"lmg-analytics:"}},_sum:{sessions:true,productViews:true,addToCarts:true,checkoutStarts:true,purchases:true}})]);
