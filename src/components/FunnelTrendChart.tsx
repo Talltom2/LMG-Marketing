@@ -4,17 +4,20 @@ import {useState} from "react";
 
 type FunnelPoint={date:string;label:string;visitors:number;pageViews:number;addToCarts:number;checkoutVisits:number;ordersCompleted:number};
 type MetricKey="visitors"|"pageViews"|"addToCarts"|"checkoutVisits"|"ordersCompleted";
+type MetricLabels=Record<MetricKey,string>;
 
-const metrics:{key:MetricKey;label:string;color:string}[]=[
-  {key:"visitors",label:"Visitors",color:"#315f32"},
-  {key:"pageViews",label:"Page Views",color:"#2563a6"},
-  {key:"addToCarts",label:"Add to Carts",color:"#b56a18"},
-  {key:"checkoutVisits",label:"Visit Checkout",color:"#7b4aa8"},
-  {key:"ordersCompleted",label:"Orders Completed",color:"#b43d4c"},
-];
+const metricColors:Record<MetricKey,string>={
+  visitors:"#315f32",
+  pageViews:"#2563a6",
+  addToCarts:"#b56a18",
+  checkoutVisits:"#7b4aa8",
+  ordersCompleted:"#b43d4c",
+};
+const metricKeys:MetricKey[]=["visitors","pageViews","addToCarts","checkoutVisits","ordersCompleted"];
 
-export default function FunnelTrendChart({data}:{data:FunnelPoint[]}){
-  const[selected,setSelected]=useState<MetricKey[]>(metrics.map(m=>m.key));
+export default function FunnelTrendChart({data,labels}:{data:FunnelPoint[];labels:MetricLabels}){
+  const metrics=metricKeys.map(key=>({key,label:labels[key],color:metricColors[key]}));
+  const[selected,setSelected]=useState<MetricKey[]>(metricKeys);
   const toggle=(key:MetricKey)=>setSelected(current=>current.includes(key)?(current.length===1?current:current.filter(k=>k!==key)):[...current,key]);
   const width=900,height=290,padX=54,padTop=24,padBottom=44,plotH=height-padTop-padBottom,plotW=width-padX*2;
   const max=Math.max(1,...data.flatMap(d=>selected.map(key=>d[key])));
