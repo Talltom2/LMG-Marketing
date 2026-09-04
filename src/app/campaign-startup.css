@@ -1,1 +1,2 @@
 body:not(.lmg-campaign-builder-hydrated) .campaign-shell .campaign-name-title{visibility:hidden}
+.campaign-shell>.campaign-topbar>div{width:calc(100% - 48px);margin-left:auto;margin-right:auto}
