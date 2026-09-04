@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {fetchDashboardFunnelSources} from "@/lib/dashboard-funnel";
+import {ga4ConfigStatus} from "@/lib/ga4";
 
 export const dynamic="force-dynamic";
 
@@ -11,6 +12,7 @@ export async function GET(){
     start:start.toISOString(),
     end:end.toISOString(),
     ga4Available:result.ga4Available,
+    ga4Config:ga4ConfigStatus(),
     wooAvailable:result.wooAvailable,
     users:result.users,
     pageViews:result.pageViews,
