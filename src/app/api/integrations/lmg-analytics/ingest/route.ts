@@ -8,15 +8,31 @@ type MetricInput = {
   sku?: string;
   source?: string;
   sessions?: number;
+  visitors?: number;
+  users?: number;
   productViews?: number;
+  pageViews?: number;
+  "product_views"?: number;
+  "page_views"?: number;
   addToCarts?: number;
+  "add_to_carts"?: number;
   checkoutStarts?: number;
+  checkoutVisits?: number;
+  checkouts?: number;
+  "checkout_starts"?: number;
+  "checkout_visits"?: number;
   purchases?: number;
+  ordersCompleted?: number;
+  orders?: number;
+  transactions?: number;
+  "orders_completed"?: number;
+  "order_completed"?: number;
   revenue?: number;
 };
 
 const asInt = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
 const asMoney = (value: unknown) => Math.max(0, Number(value) || 0);
+const firstDefined=(...values:unknown[])=>values.find(value=>value!==undefined&&value!==null);
 
 function utcDay(value: string) {
   const parsed = new Date(value);
@@ -84,11 +100,11 @@ export async function POST(request: NextRequest) {
             source: metricSource,
             channelId: channel.id,
             productId: product?.id ?? null,
-            sessions: asInt(item.sessions),
-            productViews: asInt(item.productViews),
-            addToCarts: asInt(item.addToCarts),
-            checkoutStarts: asInt(item.checkoutStarts),
-            purchases: asInt(item.purchases),
+            sessions: asInt(firstDefined(item.sessions,item.visitors,item.users)),
+            productViews: asInt(firstDefined(item.productViews,item.pageViews,item["product_views"],item["page_views"])),
+            addToCarts: asInt(firstDefined(item.addToCarts,item["add_to_carts"])),
+            checkoutStarts: asInt(firstDefined(item.checkoutStarts,item.checkoutVisits,item.checkouts,item["checkout_starts"],item["checkout_visits"])),
+            purchases: asInt(firstDefined(item.purchases,item.ordersCompleted,item.orders,item.transactions,item["orders_completed"],item["order_completed"])),
             revenue: asMoney(item.revenue),
           },
         });
