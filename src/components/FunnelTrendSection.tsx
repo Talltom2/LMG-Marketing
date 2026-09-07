@@ -1,5 +1,5 @@
 import {db} from "@/lib/db";
-import {fetchGa4DailyFunnel} from "@/lib/ga4";
+import {fetchGa4WeeklyFunnel} from "@/lib/ga4";
 import {fetchWooFunnelOrders,isCompletedFunnelOrder,type WooFunnelOrder} from "@/lib/dashboard-funnel";
 import FunnelTrendChart from "@/components/FunnelTrendChart";
 
@@ -19,20 +19,26 @@ export default async function FunnelTrendSection(){
   const historyStart=new Date(currentEnd.getTime()-(weeks*7-1)*DAY);historyStart.setUTCHours(0,0,0,0);
   const [rows,ga4Result,wooResult]=await Promise.all([
     db.funnelMetric.findMany({where:{date:{gte:historyStart,lte:currentEnd},source:{startsWith:"lmg-analytics:"}},select:{date:true,sessions:true,productViews:true,addToCarts:true,purchases:true},orderBy:{date:"asc"}}),
-    fetchGa4DailyFunnel(historyStart.toISOString().slice(0,10),currentEnd.toISOString().slice(0,10)).then(rows=>({ok:true as const,rows})).catch(()=>({ok:false as const,rows:[]})),
+    fetchGa4WeeklyFunnel(historyStart.toISOString().slice(0,10),currentEnd.toISOString().slice(0,10)).then(rows=>({ok:true as const,rows})).catch(()=>({ok:false as const,rows:[]})),
     fetchWooFunnelOrders(historyStart,currentEnd).then(rows=>({ok:true as const,rows})).catch(()=>({ok:false as const,rows:[]})),
   ]);
+  const ga4WeekMap=new Map(ga4Result.rows.map(row=>[row.week,row]));
   const points=Array.from({length:weeks},(_,i)=>{
     const end=new Date(currentEnd.getTime()-(weeks-1-i)*7*DAY);
     const start=new Date(end.getTime()-6*DAY);start.setUTCHours(0,0,0,0);
     let lmgSessions=0,lmgProductViews=0,lmgAddToCarts=0,lmgPurchases=0;
     for(const row of rows){if(row.date>=start&&row.date<=end){lmgSessions+=row.sessions;lmgProductViews+=row.productViews;lmgAddToCarts+=row.addToCarts;lmgPurchases+=row.purchases}}
+
     let visitors=lmgSessions,pageViews=lmgProductViews,addToCarts=lmgAddToCarts,checkoutVisits=0,ga4Transactions=0;
     if(ga4Result.ok){
-      visitors=0;pageViews=0;addToCarts=0;
-      const startKey=start.toISOString().slice(0,10),endKey=end.toISOString().slice(0,10);
-      for(const row of ga4Result.rows){if(row.date>=startKey&&row.date<=endKey){visitors+=row.sessions;pageViews+=row.pageViews;addToCarts+=row.addToCarts;checkoutVisits+=row.checkouts;ga4Transactions+=row.transactions}}
+      const week=ga4WeekMap.get(i);
+      visitors=week?.users??0;
+      pageViews=week?.pageViews??0;
+      addToCarts=week?.addToCartUsers??0;
+      checkoutVisits=week?.checkouts??0;
+      ga4Transactions=week?.transactions??0;
     }
+
     let ordersCompleted=ga4Result.ok?ga4Transactions:lmgPurchases;
     if(wooResult.ok){
       ordersCompleted=wooResult.rows.filter(order=>{
@@ -43,9 +49,9 @@ export default async function FunnelTrendSection(){
     return{date:end.toISOString().slice(0,10),label:end.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"}),visitors,pageViews,addToCarts,checkoutVisits,ordersCompleted};
   });
   const labels={
-    visitors:"Sessions",
+    visitors:ga4Result.ok?"Visitors":"Sessions",
     pageViews:ga4Result.ok?"Page Views":"Product View Events",
-    addToCarts:"Add-to-Cart Events",
+    addToCarts:ga4Result.ok?"Visitors Adding to Cart":"Add-to-Cart Events",
     checkoutVisits:"Checkout-Start Events",
     ordersCompleted:"Orders",
   };
