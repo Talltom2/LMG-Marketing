@@ -10,7 +10,7 @@ export type DashboardFunnelSources={
   users:number;
   pageViews:number;
   addToCartEvents:number;
-  addToCartUsers:number|null;
+  addToCartUsers:number;
   addToCartVisitorRate:number|null;
   checkoutStarts:number;
   transactions:number;
@@ -47,7 +47,7 @@ export async function fetchDashboardFunnelSources(start:Date,end:Date):Promise<D
       .then(summary=>({ok:true as const,summary}))
       .catch(error=>{
         console.error("GA4 funnel summary failed",error);
-        return {ok:false as const,summary:{sessions:0,users:0,pageViews:0,addToCartEvents:0,addToCartUsers:null,addToCartVisitorRate:null,checkouts:0,transactions:0}};
+        return {ok:false as const,summary:{sessions:0,users:0,pageViews:0,addToCartEvents:0,addToCartUsers:0,addToCartVisitorRate:null,checkouts:0,transactions:0}};
       }),
     fetchWooFunnelOrders(start,end)
       .then(rows=>({ok:true as const,rows}))
