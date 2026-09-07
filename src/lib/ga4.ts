@@ -52,7 +52,7 @@ export type Ga4FunnelSummary={
   users:number;
   pageViews:number;
   addToCartEvents:number;
-  addToCartUsers:number|null;
+  addToCartUsers:number;
   addToCartVisitorRate:number|null;
   checkouts:number;
   transactions:number;
@@ -113,7 +113,7 @@ export async function fetchGa4FunnelSummary(startDate:string,endDate:string):Pro
   const overall=await runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],limit:1});
   const m=overall.rows?.[0]?.metricValues??[];
   const users=Number(m[1]?.value??0);
-  let addToCartUsers:number|null=null;
+  let addToCartUsers=0;
   try{
     addToCartUsers=await fetchEventUsers(startDate,endDate,"add_to_cart");
   }catch(error){
@@ -125,7 +125,7 @@ export async function fetchGa4FunnelSummary(startDate:string,endDate:string):Pro
     pageViews:Number(m[2]?.value??0),
     addToCartEvents:Number(m[3]?.value??0),
     addToCartUsers,
-    addToCartVisitorRate:users&&addToCartUsers!=null?addToCartUsers/users:null,
+    addToCartVisitorRate:users?addToCartUsers/users:null,
     checkouts:Number(m[4]?.value??0),
     transactions:Number(m[5]?.value??0),
   };
