@@ -12,7 +12,8 @@ async function accessToken(){
   const unsigned=`${header}.${payload}`;
   const signature=crypto.createSign("RSA-SHA256").update(unsigned).end().sign(privateKey);
   const assertion=`${unsigned}.${b64url(signature)}`;
-  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion});
+  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth-type:jwt-bearer",assertion});
+  body.set("grant_type","urn:ietf:params:oauth:grant-type:jwt-bearer");
   const response=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body,cache:"no-store"});
   if(!response.ok) throw new Error(`GA4 OAuth failed: ${response.status} ${await response.text()}`);
   const json=await response.json() as {access_token?:string};
@@ -20,26 +21,46 @@ async function accessToken(){
   return json.access_token;
 }
 
-export type Ga4DailyFunnel={date:string;sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number};
-
-export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promise<Ga4DailyFunnel[]>{
+async function runReport(body:unknown){
   const propertyId=process.env.GA4_PROPERTY_ID?.trim();
   if(!propertyId) throw new Error("GA4_PROPERTY_ID is not configured");
   const token=await accessToken();
   const response=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${encodeURIComponent(propertyId)}:runReport`,{
     method:"POST",
     headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
-    body:JSON.stringify({dateRanges:[{startDate,endDate}],dimensions:[{name:"date"}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],orderBys:[{dimension:{dimensionName:"date"}}],limit:10000}),
+    body:JSON.stringify(body),
     cache:"no-store",
   });
   if(!response.ok) throw new Error(`GA4 Data API failed: ${response.status} ${await response.text()}`);
-  const json=await response.json() as {rows?:Array<{dimensionValues?:Array<{value?:string}>,metricValues?:Array<{value?:string}>}>};
+  return response.json() as Promise<{rows?:Array<{dimensionValues?:Array<{value?:string}>,metricValues?:Array<{value?:string}>}>}>;
+}
+
+export type Ga4DailyFunnel={date:string;sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number};
+export type Ga4FunnelSummary={sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number;cartToViewRate:number|null};
+
+export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promise<Ga4DailyFunnel[]>{
+  const json=await runReport({dateRanges:[{startDate,endDate}],dimensions:[{name:"date"}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],orderBys:[{dimension:{dimensionName:"date"}}],limit:10000});
   return (json.rows??[]).map(row=>{
     const raw=row.dimensionValues?.[0]?.value??"";
     const date=raw.length===8?`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`:raw;
     const m=row.metricValues??[];
     return {date,sessions:Number(m[0]?.value??0),users:Number(m[1]?.value??0),pageViews:Number(m[2]?.value??0),addToCarts:Number(m[3]?.value??0),checkouts:Number(m[4]?.value??0),transactions:Number(m[5]?.value??0)};
   });
+}
+
+export async function fetchGa4FunnelSummary(startDate:string,endDate:string):Promise<Ga4FunnelSummary>{
+  const json=await runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"},{name:"cartToViewRate"}],limit:1});
+  const m=json.rows?.[0]?.metricValues??[];
+  const rawCartToViewRate=m[6]?.value;
+  return{
+    sessions:Number(m[0]?.value??0),
+    users:Number(m[1]?.value??0),
+    pageViews:Number(m[2]?.value??0),
+    addToCarts:Number(m[3]?.value??0),
+    checkouts:Number(m[4]?.value??0),
+    transactions:Number(m[5]?.value??0),
+    cartToViewRate:rawCartToViewRate==null||rawCartToViewRate===""?null:Number(rawCartToViewRate),
+  };
 }
 
 export function ga4ConfigStatus(){
