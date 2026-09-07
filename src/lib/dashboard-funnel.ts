@@ -9,7 +9,9 @@ export type DashboardFunnelSources={
   sessions:number;
   users:number;
   pageViews:number;
-  addToCarts:number;
+  addToCartEvents:number;
+  addToCartUsers:number;
+  addToCartVisitorRate:number|null;
   checkoutStarts:number;
   transactions:number;
   cartToViewRate:number|null;
@@ -44,7 +46,7 @@ export async function fetchDashboardFunnelSources(start:Date,end:Date):Promise<D
   const [ga4Result,wooResult]=await Promise.all([
     fetchGa4FunnelSummary(startDay,endDay)
       .then(summary=>({ok:true as const,summary}))
-      .catch(()=>({ok:false as const,summary:{sessions:0,users:0,pageViews:0,addToCarts:0,checkouts:0,transactions:0,cartToViewRate:null}})),
+      .catch(()=>({ok:false as const,summary:{sessions:0,users:0,pageViews:0,addToCartEvents:0,addToCartUsers:0,addToCartVisitorRate:null,checkouts:0,transactions:0,cartToViewRate:null}})),
     fetchWooFunnelOrders(start,end)
       .then(rows=>({ok:true as const,rows}))
       .catch(()=>({ok:false as const,rows:[]})),
@@ -58,7 +60,9 @@ export async function fetchDashboardFunnelSources(start:Date,end:Date):Promise<D
     sessions:ga4Result.summary.sessions,
     users:ga4Result.summary.users,
     pageViews:ga4Result.summary.pageViews,
-    addToCarts:ga4Result.summary.addToCarts,
+    addToCartEvents:ga4Result.summary.addToCartEvents,
+    addToCartUsers:ga4Result.summary.addToCartUsers,
+    addToCartVisitorRate:ga4Result.summary.addToCartVisitorRate,
     checkoutStarts:ga4Result.summary.checkouts,
     transactions:ga4Result.summary.transactions,
     cartToViewRate:ga4Result.summary.cartToViewRate,
