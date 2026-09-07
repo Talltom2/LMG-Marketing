@@ -46,6 +46,7 @@ async function fetchEventUsers(startDate:string,endDate:string,eventName:string)
 }
 
 export type Ga4DailyFunnel={date:string;sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number};
+export type Ga4WeeklyFunnel={week:number;sessions:number;users:number;pageViews:number;addToCartEvents:number;addToCartUsers:number;checkouts:number;transactions:number};
 export type Ga4FunnelSummary={
   sessions:number;
   users:number;
@@ -65,6 +66,47 @@ export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promi
     const date=raw.length===8?`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`:raw;
     const m=row.metricValues??[];
     return {date,sessions:Number(m[0]?.value??0),users:Number(m[1]?.value??0),pageViews:Number(m[2]?.value??0),addToCarts:Number(m[3]?.value??0),checkouts:Number(m[4]?.value??0),transactions:Number(m[5]?.value??0)};
+  });
+}
+
+export async function fetchGa4WeeklyFunnel(startDate:string,endDate:string):Promise<Ga4WeeklyFunnel[]>{
+  const [overall,cartUsers]=await Promise.all([
+    runReport({
+      dateRanges:[{startDate,endDate}],
+      dimensions:[{name:"nthWeek"}],
+      metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],
+      orderBys:[{dimension:{dimensionName:"nthWeek"}}],
+      limit:1000,
+    }),
+    runReport({
+      dateRanges:[{startDate,endDate}],
+      dimensions:[{name:"nthWeek"},{name:"eventName"}],
+      metrics:[{name:"totalUsers"}],
+      dimensionFilter:{filter:{fieldName:"eventName",stringFilter:{matchType:"EXACT",value:"add_to_cart",caseSensitive:true}}},
+      orderBys:[{dimension:{dimensionName:"nthWeek"}}],
+      limit:1000,
+    }),
+  ]);
+
+  const cartUsersByWeek=new Map<number,number>();
+  for(const row of cartUsers.rows??[]){
+    const week=Number(row.dimensionValues?.[0]?.value??0);
+    cartUsersByWeek.set(week,Number(row.metricValues?.[0]?.value??0));
+  }
+
+  return (overall.rows??[]).map(row=>{
+    const week=Number(row.dimensionValues?.[0]?.value??0);
+    const m=row.metricValues??[];
+    return{
+      week,
+      sessions:Number(m[0]?.value??0),
+      users:Number(m[1]?.value??0),
+      pageViews:Number(m[2]?.value??0),
+      addToCartEvents:Number(m[3]?.value??0),
+      addToCartUsers:cartUsersByWeek.get(week)??0,
+      checkouts:Number(m[4]?.value??0),
+      transactions:Number(m[5]?.value??0),
+    };
   });
 }
 
