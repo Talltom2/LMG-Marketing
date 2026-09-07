@@ -12,7 +12,7 @@ async function accessToken(){
   const unsigned=`${header}.${payload}`;
   const signature=crypto.createSign("RSA-SHA256").update(unsigned).end().sign(privateKey);
   const assertion=`${unsigned}.${b64url(signature)}`;
-  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion});
+  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth-bearer",assertion});
   const response=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body,cache:"no-store"});
   if(!response.ok) throw new Error(`GA4 OAuth failed: ${response.status} ${await response.text()}`);
   const json=await response.json() as {access_token?:string};
@@ -52,11 +52,10 @@ export type Ga4FunnelSummary={
   users:number;
   pageViews:number;
   addToCartEvents:number;
-  addToCartUsers:number;
+  addToCartUsers:number|null;
   addToCartVisitorRate:number|null;
   checkouts:number;
   transactions:number;
-  cartToViewRate:number|null;
 };
 
 export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promise<Ga4DailyFunnel[]>{
@@ -111,23 +110,24 @@ export async function fetchGa4WeeklyFunnel(startDate:string,endDate:string):Prom
 }
 
 export async function fetchGa4FunnelSummary(startDate:string,endDate:string):Promise<Ga4FunnelSummary>{
-  const [overall,addToCartUsers]=await Promise.all([
-    runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"},{name:"cartToViewRate"}],limit:1}),
-    fetchEventUsers(startDate,endDate,"add_to_cart"),
-  ]);
+  const overall=await runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],limit:1});
   const m=overall.rows?.[0]?.metricValues??[];
   const users=Number(m[1]?.value??0);
-  const rawCartToViewRate=m[6]?.value;
+  let addToCartUsers:number|null=null;
+  try{
+    addToCartUsers=await fetchEventUsers(startDate,endDate,"add_to_cart");
+  }catch(error){
+    console.error("GA4 unique add_to_cart visitor query failed",error);
+  }
   return{
     sessions:Number(m[0]?.value??0),
     users,
     pageViews:Number(m[2]?.value??0),
     addToCartEvents:Number(m[3]?.value??0),
     addToCartUsers,
-    addToCartVisitorRate:users?addToCartUsers/users:null,
+    addToCartVisitorRate:users&&addToCartUsers!=null?addToCartUsers/users:null,
     checkouts:Number(m[4]?.value??0),
     transactions:Number(m[5]?.value??0),
-    cartToViewRate:rawCartToViewRate==null||rawCartToViewRate===""?null:Number(rawCartToViewRate),
   };
 }
 
