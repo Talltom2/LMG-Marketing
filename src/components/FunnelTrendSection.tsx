@@ -31,7 +31,7 @@ export default async function FunnelTrendSection(){
     if(ga4Result.ok){
       visitors=0;pageViews=0;addToCarts=0;
       const startKey=start.toISOString().slice(0,10),endKey=end.toISOString().slice(0,10);
-      for(const row of ga4Result.rows){if(row.date>=startKey&&row.date<=endKey){visitors+=row.users;pageViews+=row.pageViews;addToCarts+=row.addToCarts;checkoutVisits+=row.checkouts;ga4Transactions+=row.transactions}}
+      for(const row of ga4Result.rows){if(row.date>=startKey&&row.date<=endKey){visitors+=row.sessions;pageViews+=row.pageViews;addToCarts+=row.addToCarts;checkoutVisits+=row.checkouts;ga4Transactions+=row.transactions}}
     }
     let ordersCompleted=ga4Result.ok?ga4Transactions:lmgPurchases;
     if(wooResult.ok){
@@ -43,10 +43,10 @@ export default async function FunnelTrendSection(){
     return{date:end.toISOString().slice(0,10),label:end.toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"}),visitors,pageViews,addToCarts,checkoutVisits,ordersCompleted};
   });
   const labels={
-    visitors:ga4Result.ok?"Visitors":"Sessions",
-    pageViews:ga4Result.ok?"Page Views":"Product Views",
-    addToCarts:"Add to Carts",
-    checkoutVisits:"Checkout Starts",
+    visitors:"Sessions",
+    pageViews:ga4Result.ok?"Page Views":"Product View Events",
+    addToCarts:"Add-to-Cart Events",
+    checkoutVisits:"Checkout-Start Events",
     ordersCompleted:"Orders",
   };
   const availability={
