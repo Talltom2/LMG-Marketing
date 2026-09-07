@@ -12,7 +12,7 @@ async function accessToken(){
   const unsigned=`${header}.${payload}`;
   const signature=crypto.createSign("RSA-SHA256").update(unsigned).end().sign(privateKey);
   const assertion=`${unsigned}.${b64url(signature)}`;
-  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth-bearer",assertion});
+  const body=new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion});
   const response=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body,cache:"no-store"});
   if(!response.ok) throw new Error(`GA4 OAuth failed: ${response.status} ${await response.text()}`);
   const json=await response.json() as {access_token?:string};
