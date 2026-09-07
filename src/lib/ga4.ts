@@ -34,8 +34,29 @@ async function runReport(body:unknown){
   return response.json() as Promise<{rows?:Array<{dimensionValues?:Array<{value?:string}>,metricValues?:Array<{value?:string}>}>}>;
 }
 
+async function fetchEventUsers(startDate:string,endDate:string,eventName:string){
+  const json=await runReport({
+    dateRanges:[{startDate,endDate}],
+    dimensions:[{name:"eventName"}],
+    metrics:[{name:"totalUsers"}],
+    dimensionFilter:{filter:{fieldName:"eventName",stringFilter:{matchType:"EXACT",value:eventName,caseSensitive:true}}},
+    limit:1,
+  });
+  return Number(json.rows?.[0]?.metricValues?.[0]?.value??0);
+}
+
 export type Ga4DailyFunnel={date:string;sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number};
-export type Ga4FunnelSummary={sessions:number;users:number;pageViews:number;addToCarts:number;checkouts:number;transactions:number;cartToViewRate:number|null};
+export type Ga4FunnelSummary={
+  sessions:number;
+  users:number;
+  pageViews:number;
+  addToCartEvents:number;
+  addToCartUsers:number;
+  addToCartVisitorRate:number|null;
+  checkouts:number;
+  transactions:number;
+  cartToViewRate:number|null;
+};
 
 export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promise<Ga4DailyFunnel[]>{
   const json=await runReport({dateRanges:[{startDate,endDate}],dimensions:[{name:"date"}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"}],orderBys:[{dimension:{dimensionName:"date"}}],limit:10000});
@@ -48,14 +69,20 @@ export async function fetchGa4DailyFunnel(startDate:string,endDate:string):Promi
 }
 
 export async function fetchGa4FunnelSummary(startDate:string,endDate:string):Promise<Ga4FunnelSummary>{
-  const json=await runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"},{name:"cartToViewRate"}],limit:1});
-  const m=json.rows?.[0]?.metricValues??[];
+  const [overall,addToCartUsers]=await Promise.all([
+    runReport({dateRanges:[{startDate,endDate}],metrics:[{name:"sessions"},{name:"totalUsers"},{name:"screenPageViews"},{name:"addToCarts"},{name:"checkouts"},{name:"transactions"},{name:"cartToViewRate"}],limit:1}),
+    fetchEventUsers(startDate,endDate,"add_to_cart"),
+  ]);
+  const m=overall.rows?.[0]?.metricValues??[];
+  const users=Number(m[1]?.value??0);
   const rawCartToViewRate=m[6]?.value;
   return{
     sessions:Number(m[0]?.value??0),
-    users:Number(m[1]?.value??0),
+    users,
     pageViews:Number(m[2]?.value??0),
-    addToCarts:Number(m[3]?.value??0),
+    addToCartEvents:Number(m[3]?.value??0),
+    addToCartUsers,
+    addToCartVisitorRate:users?addToCartUsers/users:null,
     checkouts:Number(m[4]?.value??0),
     transactions:Number(m[5]?.value??0),
     cartToViewRate:rawCartToViewRate==null||rawCartToViewRate===""?null:Number(rawCartToViewRate),
