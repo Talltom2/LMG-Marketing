@@ -18,7 +18,7 @@ export default async function FunnelTrendSection(){
   const weeks=26;
   const historyStart=new Date(currentEnd.getTime()-(weeks*7-1)*DAY);historyStart.setUTCHours(0,0,0,0);
   const [rows,ga4Result,wooResult]=await Promise.all([
-    db.funnelMetric.findMany({where:{date:{gte:historyStart,lte:currentEnd},source:{startsWith:"lmg-analytics:"}},select:{date:true,sessions:true,productViews:true,addToCarts:true,purchases:true},orderBy:{date:"asc"}}),
+    db.funnelMetric.findMany({where:{date:{gte:historyStart,lte:currentEnd},source:{startsWith:"lmg-analytics:"}},select:{date:true,sessions:true,productViews:true,purchases:true},orderBy:{date:"asc"}}),
     fetchGa4WeeklyFunnel(historyStart.toISOString().slice(0,10),currentEnd.toISOString().slice(0,10)).then(rows=>({ok:true as const,rows})).catch(()=>({ok:false as const,rows:[]})),
     fetchWooFunnelOrders(historyStart,currentEnd).then(rows=>({ok:true as const,rows})).catch(()=>({ok:false as const,rows:[]})),
   ]);
@@ -26,10 +26,10 @@ export default async function FunnelTrendSection(){
   const points=Array.from({length:weeks},(_,i)=>{
     const end=new Date(currentEnd.getTime()-(weeks-1-i)*7*DAY);
     const start=new Date(end.getTime()-6*DAY);start.setUTCHours(0,0,0,0);
-    let lmgSessions=0,lmgProductViews=0,lmgAddToCarts=0,lmgPurchases=0;
-    for(const row of rows){if(row.date>=start&&row.date<=end){lmgSessions+=row.sessions;lmgProductViews+=row.productViews;lmgAddToCarts+=row.addToCarts;lmgPurchases+=row.purchases}}
+    let lmgSessions=0,lmgProductViews=0,lmgPurchases=0;
+    for(const row of rows){if(row.date>=start&&row.date<=end){lmgSessions+=row.sessions;lmgProductViews+=row.productViews;lmgPurchases+=row.purchases}}
 
-    let visitors=lmgSessions,pageViews=lmgProductViews,addToCarts=lmgAddToCarts,checkoutVisits=0,ga4Transactions=0;
+    let visitors=lmgSessions,pageViews=lmgProductViews,addToCarts=0,checkoutVisits=0,ga4Transactions=0;
     if(ga4Result.ok){
       const week=ga4WeekMap.get(i);
       visitors=week?.users??0;
@@ -51,14 +51,14 @@ export default async function FunnelTrendSection(){
   const labels={
     visitors:ga4Result.ok?"Visitors":"Sessions",
     pageViews:ga4Result.ok?"Page Views":"Product View Events",
-    addToCarts:ga4Result.ok?"Visitors Adding to Cart":"Add-to-Cart Events",
+    addToCarts:"Visitors Adding to Cart",
     checkoutVisits:"Checkout-Start Events",
     ordersCompleted:"Orders",
   };
   const availability={
     visitors:true,
     pageViews:true,
-    addToCarts:true,
+    addToCarts:ga4Result.ok,
     checkoutVisits:ga4Result.ok,
     ordersCompleted:wooResult.ok||ga4Result.ok||rows.some(row=>row.purchases>0),
   };
