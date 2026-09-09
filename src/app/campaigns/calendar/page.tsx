@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type CampaignAction={id:string;actionType:string;description:string;executionTarget?:string|null;completed:boolean;completedAt?:string|null;resultSummary?:string|null};
 type CampaignRecommendation={id:string;title:string;status?:string;actions:CampaignAction[]};
-type Campaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;products:{product:{sku:string;name:string}}[];recommendations:CampaignRecommendation[]};
+type ContentAsset={id:string;channel:string;deliverable:string;approvalStatus:string;publicationStatus:string;scheduledAt?:string|null;publishedAt?:string|null;adapter?:string|null};
+type Campaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;products:{product:{sku:string;name:string}}[];recommendations:CampaignRecommendation[];contentAssets?:ContentAsset[]};
 type OpportunityStatus="DRAFT"|"APPROVED"|"SCHEDULED"|"PUBLISHED"|"FAILED"|"COMPLETED";
 type CalendarItem={id:string;campaignId:string;campaignName:string;date:string;kind:"START"|"END"|"CHANNEL"|"CREATIVE"|"REVIEW"|"CLOSEOUT"|"PUBLISH";label:string;opportunityStatus?:OpportunityStatus};
 
@@ -42,7 +43,13 @@ export default function CampaignCalendarPage(){
   const refresh=()=>fetch("/api/campaigns",{cache:"no-store"}).then(r=>r.json()).then(d=>setCampaigns(d.campaigns??[]));
   useEffect(()=>{refresh().finally(()=>setLoading(false))},[]);
 
-  const opportunityRows=useMemo(()=>new Map(campaigns.map(c=>[c.id,(c.recommendations??[]).filter(isOpportunity).map(rec=>({id:rec.id,name:opportunityName(rec),status:opportunityStatus(rec)}))])),[campaigns]);
+  const opportunityRows=useMemo(()=>new Map(campaigns.map(c=>[
+    c.id,
+    [
+      ...(c.contentAssets??[]).map(asset=>({id:asset.id,name:`${asset.channel} · ${asset.deliverable}`,status:(asset.publicationStatus==="UNSCHEDULED"?asset.approvalStatus:asset.publicationStatus) as OpportunityStatus})),
+      ...(c.recommendations??[]).filter(isOpportunity).map(rec=>({id:rec.id,name:opportunityName(rec),status:opportunityStatus(rec)})),
+    ],
+  ])),[campaigns]);
   const items=useMemo<CalendarItem[]>(()=>campaigns.flatMap(c=>{
     const base:CalendarItem[]=[
       {id:`${c.id}-creative`,campaignId:c.id,campaignName:c.name,date:addDays(c.startDate,-2),kind:"CREATIVE",label:"Creative review & final approval"},
@@ -62,6 +69,7 @@ export default function CampaignCalendarPage(){
         else if(a.actionType==="PUBLISH_EXECUTION"&&a.completed&&a.completedAt&&looksLikeDate(a.completedAt))base.push({id:`${a.id}-published`,campaignId:c.id,campaignName:c.name,date:dateOnly(a.completedAt),kind:"PUBLISH",label:`${opportunityName(rec)} published`,opportunityStatus:"PUBLISHED"});
       });
     });
+    c.contentAssets?.forEach(asset=>{if(asset.scheduledAt)base.push({id:`${asset.id}-scheduled`,campaignId:c.id,campaignName:c.name,date:dateOnly(asset.scheduledAt),kind:"CHANNEL",label:`${asset.channel} · ${asset.deliverable}`,opportunityStatus:asset.publicationStatus as OpportunityStatus});if(asset.publishedAt)base.push({id:`${asset.id}-published`,campaignId:c.id,campaignName:c.name,date:dateOnly(asset.publishedAt),kind:"PUBLISH",label:`${asset.deliverable} published${asset.adapter?` by ${asset.adapter}`:""}`,opportunityStatus:"PUBLISHED"})});
     return base;
   }),[campaigns]);
 

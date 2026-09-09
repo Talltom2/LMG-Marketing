@@ -1,15 +1,11 @@
 import Link from "next/link";
 
 const links=[
-  ["/campaigns/calendar","Calendar"],
-  ["/campaigns","Build"],
-  ["/promotional-assets","Opportunities"],
-  ["/campaigns/execution","Execute"],
-  ["/campaigns/metrics","Metrics"],
-  ["/campaigns/diagnostics","Diagnostics"],
-  ["/campaigns/alerts","Alerts"],
-  ["/campaigns/production","Creative"],
-  ["/campaigns/closeout","Learning"],
+  ["/campaigns","Campaigns"],
+  ["/campaigns/calendar","Schedule"],
+  ["/campaigns/diagnostics","Performance & Data Health"],
+  ["/campaigns/alerts","Data Alerts"],
+  ["/campaigns/closeout","Closeout"],
 ] as const;
 
 export default function LmgTopNav({active,global=false}:{active?:string;global?:boolean}){

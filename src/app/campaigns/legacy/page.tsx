@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import{useEffect,useMemo,useState}from"react";
-import{campaignTemplates}from"./templates";
-import{opportunityCatalog,opportunityFor,recommendedOpportunityIdsFor}from"./opportunities";
+import{campaignTemplates}from"../templates";
+import{opportunityCatalog,opportunityFor,recommendedOpportunityIdsFor}from"../opportunities";
 
 type ProductRow={sku:string;name:string;units:number;commerceRevenue:number;productViews:number;purchaseConversionRate:number;signal:"PROMOTE"|"FIX_CONVERSION"|"WATCH"|"INSUFFICIENT_DATA";imageUrl?:string|null;galleryUrls?:string[]};
 type SavedCampaign={id:string;name:string;objective?:string|null;startDate:string;endDate:string;status:string;products:{product:{sku:string;name:string}}[]};

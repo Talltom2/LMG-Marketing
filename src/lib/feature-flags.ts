@@ -6,6 +6,7 @@ export const featureFlags = {
   aiStrategy: enabled("FEATURE_AI_STRATEGY"),
   complexDiagnostics: enabled("FEATURE_COMPLEX_DIAGNOSTICS"),
   automaticCorrectiveActions: enabled("FEATURE_AUTOMATIC_CORRECTIVE_ACTIONS"),
+  legacyCampaignWorkflow: enabled("FEATURE_LEGACY_CAMPAIGN_WORKFLOW"),
 } as const;
 
 export function disabledFeatureResponse(label: string) {
