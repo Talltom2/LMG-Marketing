@@ -1,9 +1,11 @@
 import {NextRequest,NextResponse} from "next/server";
+import {disabledFeatureResponse,featureFlags} from "@/lib/feature-flags";
 
 export const dynamic="force-dynamic";
 
 export async function POST(request:NextRequest){
  try{
+  if(!featureFlags.internalAiImages)return NextResponse.json(disabledFeatureResponse("Internal AI image generation"),{status:403});
   const key=process.env.OPENAI_API_KEY;
   if(!key)return NextResponse.json({error:"OPENAI_API_KEY is not configured in the production environment."},{status:503});
   const body=await request.json() as {prompt?:string;sourceImageUrl?:string;orientation?:"portrait"|"landscape"};

@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { disabledFeatureResponse, featureFlags } from "@/lib/feature-flags";
 
 export async function POST(request: Request) {
   try {
+    if (!featureFlags.automaticCorrectiveActions) {
+      return NextResponse.json(disabledFeatureResponse("Automatic corrective actions"), { status: 403 });
+    }
     const body = await request.json();
     const required = ["channelId", "channelName", "layer", "title", "observation", "likelyCause", "recommendation", "confidence"];
     for (const key of required) {

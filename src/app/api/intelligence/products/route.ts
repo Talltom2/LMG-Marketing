@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
         const sku = String(product.sku).trim();
         const existing = bySku.get(sku.toLowerCase());
         const imageData=images.get(sku.toLowerCase())??{imageUrl:null,galleryUrls:[]};
-        return existing ? {...existing,...imageData} : {
+        const live={price:product.price,stock:product.stock,stockStatus:product.stockStatus,url:product.permalink};
+        return existing ? {...existing,...live,...imageData} : {
           sku,
           name: product.name,
           units: 0,
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
           viewToCartRate: 0,
           purchaseConversionRate: 0,
           signal: "INSUFFICIENT_DATA" as const,
+          ...live,
           ...imageData,
         };
       })

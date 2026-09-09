@@ -41,20 +41,36 @@ enum CampaignStatus {
   COMPLETED
 }
 
-model Product {
-  id          String   @id @default(cuid())
-  sku         String   @unique
-  name        String
-  category    String?
-  season      String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum ContentApprovalStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
 
-  commerceMetrics   CommerceMetric[]
-  funnelMetrics     FunnelMetric[]
-  campaignProducts  CampaignProduct[]
-  recommendations   Recommendation[]
+enum PublicationStatus {
+  UNSCHEDULED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  sku       String   @unique
+  name      String
+  category  String?
+  season    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  commerceMetrics  CommerceMetric[]
+  funnelMetrics    FunnelMetric[]
+  campaignProducts CampaignProduct[]
+  recommendations  Recommendation[]
 }
 
 model Channel {
@@ -120,33 +136,100 @@ model FunnelMetric {
 }
 
 model SyncRun {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   source       String
-  startedAt    DateTime @default(now())
+  startedAt    DateTime  @default(now())
   completedAt  DateTime?
-  status       String   @default("RUNNING")
-  recordsRead  Int      @default(0)
-  recordsSaved Int      @default(0)
+  status       String    @default("RUNNING")
+  recordsRead  Int       @default(0)
+  recordsSaved Int       @default(0)
   errorMessage String?
 
   @@index([source, startedAt])
 }
 
 model Campaign {
-  id          String         @id @default(cuid())
-  name        String
-  theme       String?
-  objective   String?
-  startDate   DateTime
-  endDate     DateTime
-  status      CampaignStatus @default(DRAFT)
-  channelId   String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  name          String
+  theme         String?
+  objective     String?
+  startDate     DateTime
+  endDate       DateTime
+  status        CampaignStatus @default(DRAFT)
+  channelId     String?
+  offer         String?
+  budget        Decimal        @default(0) @db.Decimal(12, 2)
+  channels      Json?
+  workflowStage String         @default("DEFINITION")
+  approvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  channel         Channel?          @relation(fields: [channelId], references: [id])
+  channel         Channel?                 @relation(fields: [channelId], references: [id])
   products        CampaignProduct[]
   recommendations Recommendation[]
+  contentAssets   CampaignContentAsset[]
+  followUpActions CampaignFollowUpAction[]
+  closeout        CampaignCloseout?
+}
+
+model CampaignContentAsset {
+  id                  String                @id @default(cuid())
+  campaignId          String
+  channel             String
+  deliverable         String
+  headline            String?
+  bodyCopy            String?
+  cta                 String?
+  destinationUrl      String?
+  imageReference      String?
+  notes               String?
+  trackingParameters  Json?
+  approvalStatus      ContentApprovalStatus @default(DRAFT)
+  approvedAt          DateTime?
+  scheduledAt         DateTime?
+  publicationStatus   PublicationStatus     @default(UNSCHEDULED)
+  adapter             String?
+  adapterConfirmation Json?
+  publishedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, channel, deliverable])
+  @@index([campaignId, approvalStatus])
+  @@index([scheduledAt, publicationStatus])
+}
+
+model CampaignFollowUpAction {
+  id          String    @id @default(cuid())
+  campaignId  String
+  title       String
+  description String
+  source      String    @default("CHATGPT")
+  status      String    @default("PROPOSED")
+  dueAt       DateTime?
+  result      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+}
+
+model CampaignCloseout {
+  id         String    @id @default(cuid())
+  campaignId String    @unique
+  decision   String?
+  result     String?
+  learnings  String?
+  closedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }
 
 model CampaignProduct {
@@ -182,15 +265,15 @@ model Recommendation {
 }
 
 model Action {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   recommendationId String
   actionType       String
   description      String
   executionTarget  String?
-  completed        Boolean  @default(false)
+  completed        Boolean   @default(false)
   completedAt      DateTime?
   resultSummary    String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
 }
